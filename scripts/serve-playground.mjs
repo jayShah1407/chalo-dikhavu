@@ -12,7 +12,9 @@ createServer(async (req, res) => {
   const path = new URL(req.url, "http://x").pathname;
   const file = files[path];
   try {
-    const body = await readFile(file ?? "examples/playground/index.html");
+    let body = await readFile(file ?? "examples/playground/index.html", "utf-8");
+    // BARE=1 serves the page without Raahi, to test injection by the dev extension.
+    if (!file && process.env.BARE) body = body.replace(/<script src="\/raahi[\s\S]*<\/script>\s*(?=<\/body>)/, "");
     res.writeHead(200, { "content-type": file ? "text/javascript" : "text/html; charset=utf-8" });
     res.end(body);
   } catch {

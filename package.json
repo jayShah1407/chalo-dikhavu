@@ -30,7 +30,8 @@
     "prepublishOnly": "npm run typecheck && npm test && npm run build",
     "extension": "tsup && node scripts/build-extension.mjs",
     "playground": "node scripts/serve-playground.mjs",
-    "e2e": "node test/e2e.mjs"
+    "e2e": "node test/e2e.mjs",
+    "try": "npm run extension && node scripts/open-with-extension.mjs"
   },
   "keywords": [
     "product-tour",

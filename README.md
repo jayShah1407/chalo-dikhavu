@@ -101,6 +101,8 @@ npm run e2e            # real-browser test against the playground (needs Chrome)
 
 After changing code or flows, run `npm run extension` again and click reload on the extension.
 
+Shortcut: `npm run try` builds everything and opens a separate Chromium window with the extension already loaded (first time: `npx playwright-core install chromium`).
+
 ## License
 
 MIT
