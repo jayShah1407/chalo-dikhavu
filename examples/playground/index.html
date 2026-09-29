@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Raahi playground</title>
+  <!-- A tiny single-page app shaped like the Tution Techer student portal,
+       so flows can be tried without running that project. -->
+  <style>
+    body { margin: 0; font-family: system-ui, sans-serif; display: flex; min-height: 100vh; background: #f8fafc; color: #0f172a; }
+    aside { width: 220px; background: #fff; border-right: 1px solid #e2e8f0; padding: 20px 12px; }
+    aside a { display: block; padding: 8px 12px; border-radius: 8px; color: #475569; text-decoration: none; font-size: 14px; }
+    aside a.active { background: #0b3d91; color: #fff; }
+    main { flex: 1; padding: 32px; }
+    button, select, input, textarea { font: inherit; }
+    .pill { border: 1px solid #cbd5e1; background: #fff; border-radius: 999px; padding: 6px 14px; margin-right: 6px; cursor: pointer; }
+    .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 20px; }
+    .card { display: block; background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 16px; color: inherit; text-decoration: none; }
+    .box { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 20px; max-width: 420px; }
+    label.opt { display: block; border: 2px solid #e2e8f0; border-radius: 12px; padding: 12px; margin: 8px 0; cursor: pointer; }
+    .spacer { height: 900px; }
+  </style>
+</head>
+<body>
+  <aside>
+    <strong style="display:block;padding:0 12px 16px">Tution Techer (demo)</strong>
+    <a href="/student">Dashboard</a>
+    <a href="/student/classroom">Classroom</a>
+    <a href="/student/teachers">Find Teachers</a>
+    <a href="/student/enrollments">My Enrollments</a>
+    <a href="/student/wallet">Wallet</a>
+  </aside>
+  <main id="app"></main>
+
+  <script>
+    const views = {
+      "/student": () => `<h1>Welcome back</h1><p>Your dashboard.</p>`,
+      "/student/teachers": () => `
+        <h1>Find a Teacher</h1>
+        <button class="pill" type="button">Subject</button>
+        <button class="pill" type="button">Language</button>
+        <button class="pill" type="button">Accent</button>
+        <label for="sort">Sort by:</label>
+        <select id="sort"><option>Highest rated</option><option>Price: low to high</option></select>
+        <div class="grid">
+          <a class="card" href="/student/teachers/t1"><b>Asha Mehta</b><p>Maths · Hindi, English</p></a>
+          <a class="card" href="/student/teachers/t2"><b>Ravi Patel</b><p>Physics · Gujarati</p></a>
+        </div>`,
+      "/student/teachers/:id": () => `
+        <h1>Asha Mehta</h1><div class="spacer"></div>
+        <div class="box">
+          <h2>Send request</h2>
+          <form onsubmit="event.preventDefault(); this.innerHTML='<p>Your request has been sent.</p>'">
+            <label class="opt"><input type="radio" name="o" checked /> Maths crash course</label>
+            <label class="opt"><input type="radio" name="o" /> Custom one-off class</label>
+            <input id="scheduledAt" type="datetime-local" /><br /><br />
+            <textarea id="studentNote" rows="3" placeholder="Anything the teacher should know…"></textarea><br />
+            <button type="submit">Send request</button>
+          </form>
+        </div>`,
+      "/student/classroom": () => `<h1>Classroom</h1><button type="button">Join class</button>`,
+      "/student/enrollments": () => `<h1>My Enrollments</h1>`,
+      "/student/wallet": () => `
+        <h1>Wallet</h1><p data-testid="student-wallet-balance" style="font-size:32px">QAR 120</p>
+        <button type="button">Refunds (1)</button> <button type="button">Wallet history (3)</button>`,
+    };
+
+    function render() {
+      const path = location.pathname.replace(/\/$/, "") || "/student";
+      const key = views[path] ? path : /^\/student\/teachers\/[^/]+$/.test(path) ? "/student/teachers/:id" : "/student";
+      // Re-render with a fresh DOM each time, like React does, to exercise re-finding targets.
+      document.getElementById("app").innerHTML = views[key]();
+      document.querySelectorAll("aside a").forEach((a) => a.classList.toggle("active", a.pathname === path));
+    }
+
+    // Client-side routing, like Next.js <Link>.
+    document.addEventListener("click", (e) => {
+      const a = e.target.closest("a[href^='/']");
+      if (!a || e.defaultPrevented) return;
+      e.preventDefault();
+      history.pushState(null, "", a.getAttribute("href"));
+      render();
+    });
+    addEventListener("popstate", render);
+    render();
+  </script>
+  <script src="/raahi.global.js"></script>
+  <script src="/flows.js"></script>
+  <script>
+    window.guide = Raahi.init({ flows: RAAHI_FLOWS, language: "en", languages: ["en", "hi"], color: "#0b5fd9" });
+  </script>
+</body>
+</html>
