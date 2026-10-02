@@ -28,6 +28,49 @@ export function canListen(): boolean {
 }
 
 /**
+ * Listen for one answer after a question: stops by itself after a pause.
+ * Resolves "" if nothing was heard, voice is unavailable, or `signal` aborts;
+ * the caller then keeps waiting for a typed answer instead.
+ */
+export function listenOnce(lang: string, signal: AbortSignal, onInterim?: (text: string) => void, maxMs = 12000): Promise<string> {
+  const Ctor = recognitionCtor();
+  if (!Ctor || signal.aborted) return Promise.resolve("");
+  return new Promise((resolve) => {
+    const rec = new Ctor();
+    rec.lang = speechLocale(lang);
+    rec.interimResults = true;
+    rec.continuous = false;
+    let heard = "";
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      signal.removeEventListener("abort", onAbort);
+      resolve(heard.trim());
+    };
+    const onAbort = () => {
+      heard = "";
+      rec.abort();
+      finish();
+    };
+    rec.onresult = (e) => {
+      heard = Array.from({ length: e.results.length }, (_, i) => e.results[i][0].transcript).join(" ");
+      onInterim?.(heard);
+    };
+    rec.onerror = finish;
+    rec.onend = finish;
+    const timer = setTimeout(() => rec.stop(), maxMs);
+    signal.addEventListener("abort", onAbort);
+    try {
+      rec.start();
+    } catch {
+      finish();
+    }
+  });
+}
+
+/**
  * Push-to-talk speech recognition: start() when the key goes down,
  * finish() when it comes up, and get the whole transcript back.
  */

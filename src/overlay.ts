@@ -26,6 +26,15 @@ export interface BubbleButton {
   onClick: () => void;
 }
 
+/** A text box inside the bubble, for typing an answer instead of saying it. */
+export interface AnswerBox {
+  placeholder: string;
+  type?: string;
+  onSubmit: (text: string) => void;
+  /** The user started typing: stop listening so the two don't race. */
+  onTyping?: () => void;
+}
+
 export interface OverlayHandlers {
   onAsk: (query: string) => void;
   onMicDown: () => void;
@@ -213,18 +222,28 @@ export class Overlay {
   // ---- guide: spotlight, bubble, cursor -------------------------------------
 
   /** Point at an element (or null for a centered message) and show the bubble. */
-  showStep(el: Element | null, meta: string, text: string, buttons: BubbleButton[]): void {
+  showStep(el: Element | null, meta: string, text: string, buttons: BubbleButton[], answer?: AnswerBox): void {
     this.target = el;
     this.spot.classList.toggle("on", !!el);
     this.cursor.classList.toggle("on", !!el);
     const actions = h("div", { class: "actions" },
       ...buttons.map((b) => h("button", { class: "b" + (b.primary ? " primary" : ""), type: "button", onclick: b.onClick }, b.label)),
     );
-    this.bubble.replaceChildren(
-      h("div", { class: "meta" }, h("span", {}, meta)),
-      h("div", { class: "text" }, text),
-      actions,
-    );
+    const children: Node[] = [h("div", { class: "meta" }, h("span", {}, meta)), h("div", { class: "text" }, text)];
+    if (answer) {
+      const input = h("input", { type: answer.type ?? "text", placeholder: answer.placeholder, autocomplete: "off" });
+      input.addEventListener("keydown", (e) => e.stopPropagation()); // Space here is typing, not push-to-talk
+      input.addEventListener("input", () => answer.onTyping?.());
+      children.push(h("form", {
+        class: "answer",
+        onsubmit: (e) => {
+          e.preventDefault();
+          if (input.value.trim()) answer.onSubmit(input.value);
+        },
+      }, input, h("button", { class: "b primary", type: "submit", "aria-label": "Send" }, "↵")));
+    }
+    children.push(actions);
+    this.bubble.replaceChildren(...children);
     this.bubble.classList.add("on");
   }
 
@@ -235,7 +254,7 @@ export class Overlay {
 
   hideStep(): void {
     this.target = null;
-    this.anim = null;
+    this.settleAnim();
     this.spot.classList.remove("on");
     this.cursor.classList.remove("on");
     this.bubble.classList.remove("on");
@@ -243,6 +262,7 @@ export class Overlay {
 
   /** Glide the cursor to the current target. Resolves on arrival, with a tap ripple. */
   moveCursor(): Promise<void> {
+    this.settleAnim(); // a new move supersedes one still in flight
     return new Promise((resolve) => {
       const dist = Math.hypot(this.aim().x - this.pos.x, this.aim().y - this.pos.y);
       const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -258,6 +278,13 @@ export class Overlay {
         },
       };
     });
+  }
+
+  /** End any in-flight glide so whoever awaits it isn't left hanging. */
+  private settleAnim(): void {
+    const anim = this.anim;
+    this.anim = null;
+    anim?.done();
   }
 
   /** Where the cursor should rest: a little inside the target, like a real pointer. */

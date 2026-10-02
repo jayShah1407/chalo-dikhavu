@@ -6,7 +6,7 @@ const BASE = process.env.BASE ?? "http://localhost:4400";
 const CHROME = process.env.CHROME ?? "C:/Program Files/Google/Chrome/Application/chrome.exe";
 
 const browser = await chromium.launch({ executablePath: CHROME, headless: process.env.HEADED ? false : true });
-const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+let page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
 const errors = [];
 page.on("pageerror", (e) => errors.push(e.message));
 
@@ -22,9 +22,10 @@ async function check(name, fn) {
   }
 }
 
-const bubble = page.locator(".bubble.on .text");
+// A getter, not a constant: `page` is replaced for the do-mode tests below.
+const bubble = { textContent: () => page.locator(".bubble.on .text").textContent() };
 async function expectBubble(text) {
-  await bubble.filter({ hasText: text }).waitFor({ timeout: 5000 });
+  await page.locator(".bubble.on .text").filter({ hasText: text }).waitFor({ timeout: 5000 });
 }
 /** The cursor should have glided onto the highlighted element. */
 async function expectCursorOn(selector) {
@@ -87,6 +88,7 @@ await check("flow completes", async () => {
 
 await check("a flow resumes at the same step after a full page reload", async () => {
   await page.evaluate(() => window.guide.start("wallet"));
+  await expectBubble("Open “Wallet”");
   await page.locator('aside a[href="/student/wallet"]').click();
   await expectBubble("wallet credit");
   await page.reload();
@@ -116,6 +118,119 @@ await check("missing element shows a friendly message, not a crash", async () =>
   await page.evaluate(() => document.querySelector('aside a[href="/student/wallet"]').remove());
   await page.evaluate(() => window.guide.start("wallet"));
   await page.locator(".bubble.on").filter({ hasText: "can't find" }).waitFor({ timeout: 12000 });
+});
+
+// ---- "do it with me": the whole bank form from one `form:` step ----------------
+
+// Headless Chrome has no microphone, so stand in a fake recognizer that "hears"
+// a scripted queue of answers. `null` means silence (the user types instead).
+page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+page.on("pageerror", (e) => errors.push(e.message));
+await page.addInitScript(() => {
+  window.__speech = [];
+  // Newer Chrome has the unprefixed API too, and Raahi prefers it: replace both.
+  window.SpeechRecognition = window.webkitSpeechRecognition = class {
+    start() {
+      setTimeout(() => {
+        const text = window.__speech.shift();
+        if (text) {
+          const result = Object.assign([{ transcript: text }], { isFinal: true });
+          this.onresult?.({ resultIndex: 0, results: [result] });
+        }
+        this.onend?.();
+      }, 700); // long enough for the test to see each bubble
+    }
+    stop() {}
+    abort() {}
+  };
+});
+await page.goto(`${BASE}/bank?quiet`);
+const answerBox = page.locator(".bubble.on .answer input");
+async function typeAnswer(text) {
+  await answerBox.waitFor({ timeout: 5000 });
+  await answerBox.fill(text);
+  await answerBox.press("Enter");
+}
+
+await check("do mode: asks 'do it with me' or 'just show me' for form flows", async () => {
+  await page.evaluate(() => {
+    window.__speech.push(
+      "jay shah", "yes",                                  // name, by voice, confirmed
+      "nine eight two five zero one two three four five", "haan", // mobile, Hinglish yes
+      null,                                               // email: typed
+      "14 July 1998", "yes",                              // date of birth
+      null,                                               // PAN: typed
+      "savings", "yes",                                   // select
+      "the second one", "ji",                             // radio group
+      "haan",                                             // checkbox (no read-back needed)
+    );
+    window.guide.ask("I want to open a bank account");
+  });
+  await expectBubble("fill this in with you");
+  await page.locator(".bubble.on button.primary").click(); // Do it with me
+});
+
+await check("do mode: clicks buttons for the user (with the cursor)", async () => {
+  await page.waitForURL("**/bank/open-account", { timeout: 8000 });
+});
+
+await check("generated question + spoken answer + read-back confirmation", async () => {
+  await expectBubble("What's your full name?");
+  await expectBubble("I heard: Jay Shah");
+  await expectBubble("mobile number");
+  await expectBubble("I heard: 98250 12345");
+});
+
+await check("typed answers go straight in", async () => {
+  await expectBubble("What's your email?");
+  await typeAnswer("jay@example.com");
+});
+
+await check("dates, PAN, select and radio questions", async () => {
+  await expectBubble("date of birth");
+  await expectBubble("What's your PAN?");
+  await typeAnswer("abcde1234f");
+  await expectBubble("Which account type? You can say: Savings, Current, Salary.");
+  await expectBubble("Which gender?");
+});
+
+await check("password is never asked for: user types it", async () => {
+  await expectBubble("fill in “Set a password” yourself");
+  if (await answerBox.count()) throw new Error("sensitive field showed an answer box");
+  await page.locator("#password").fill("s3cret!");
+  await page.locator("#password").blur();
+});
+
+await check("checkbox question, then the user presses submit themselves", async () => {
+  await expectBubble("Should I tick");
+  await expectBubble("then press “Open account” yourself");
+  await page.waitForTimeout(800);
+  if (await page.locator("#result").textContent()) throw new Error("form was submitted without the user");
+  await page.locator('button[type="submit"]').click();
+  await expectBubble("All done");
+});
+
+await check("the real form received every value", async () => {
+  const got = JSON.parse(await page.locator("#result").textContent());
+  const want = {
+    fullName: "Jay Shah", mobile: "9825012345", email: "jay@example.com", dob: "1998-07-14", pan: "ABCDE1234F",
+    accountType: "savings", gender: "female", password: "(set)", terms: true,
+  };
+  for (const [k, v] of Object.entries(want)) {
+    if (got[k] !== v) throw new Error(`${k}: expected ${JSON.stringify(v)}, got ${JSON.stringify(got[k])}`);
+  }
+});
+
+await check("show mode: same form, generated pointer text, user fills it", async () => {
+  await page.goto(`${BASE}/bank/open-account?quiet`);
+  await page.evaluate(() => window.guide.start("open-account", "show"));
+  await expectBubble("Click “Open an account”.");
+  await page.locator('main a[href="/bank/open-account"]').click();
+  await expectBubble("Enter your full name here.");
+  await page.locator("#fullName").fill("Asha");
+  await page.locator("#fullName").blur();
+  await expectBubble("Enter your mobile number here.");
+  await page.evaluate(() => window.guide.stop());
 });
 
 await check("no page errors", async () => {

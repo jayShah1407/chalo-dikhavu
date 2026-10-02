@@ -30,7 +30,7 @@ export type Advance =
   /** Move on by itself after `delay` ms. */
   | "auto";
 
-export interface Step {
+export interface Step extends FieldOptions {
   /** Element to point at. Omit for a centered message. */
   target?: Target;
   /**
@@ -39,8 +39,11 @@ export interface Step {
    * for them to arrive (paths with :params).
    */
   path?: string;
-  /** What the guide says and shows in the bubble. */
-  say: LocalizedText;
+  /**
+   * What the guide says and shows in the bubble. Optional for `action` and
+   * `form` steps: Raahi writes it from the field's label ("Enter your email here").
+   */
+  say?: LocalizedText;
   /** Pre-recorded audio URL(s). Falls back to text-to-speech when missing. */
   audio?: LocalizedText;
   advance?: Advance;
@@ -48,6 +51,43 @@ export interface Step {
   delay?: number;
   /** ms to wait for the target to appear. Default 8000. */
   timeout?: number;
+
+  /**
+   * In "do it with me" mode, Raahi performs this on the target instead of
+   * waiting for the user: "click" it, or "fill" it (text, select, radio or
+   * checkbox; the question is generated from the field unless `ask` is given).
+   * In "just show me" mode the step is shown like any other.
+   */
+  action?: "click" | "fill";
+  /**
+   * A whole form: Raahi finds every field in it, in order, asks for each value
+   * and fills it, then points at the submit button. Per-field tweaks go in `fields`.
+   */
+  form?: Target;
+  /** Per-field overrides for a `form` step, keyed by CSS selector. */
+  fields?: Record<string, FieldOptions>;
+  /**
+   * Who presses a clicked button in "do" mode. Submit buttons default to
+   * "user" so an account, payment or transfer is never submitted for them.
+   */
+  confirm?: "user" | "auto";
+}
+
+/** Tweaks for a field in "do it with me" mode. Also valid directly on a `fill` step. */
+export interface FieldOptions {
+  /** Question to ask instead of the generated one. */
+  ask?: LocalizedText;
+  /** Fill this value without asking. */
+  value?: string;
+  /**
+   * Never listen to or fill this field; the user types it. Detected
+   * automatically for passwords, OTPs, PINs, CVV, card and Aadhaar numbers.
+   */
+  sensitive?: boolean;
+  /** Offer a Skip button. Default: true unless the field is `required`. */
+  optional?: boolean;
+  /** Leave this field out of a `form` step. */
+  skip?: boolean;
 }
 
 export interface Flow {
@@ -58,12 +98,22 @@ export interface Flow {
   steps: Step[];
 }
 
+export type RunMode =
+  /** Point at each thing and let the user do it. */
+  | "show"
+  /** Ask the user for values and click/fill on their behalf. */
+  | "do";
+
 export type RaahiEvent =
-  | { type: "flow:start"; flowId: string }
+  | { type: "flow:start"; flowId: string; mode: RunMode }
   | { type: "flow:end"; flowId: string; completed: boolean }
   | { type: "step:show"; flowId: string; index: number }
   | { type: "step:missing"; flowId: string; index: number }
-  | { type: "ask"; query: string; matchedFlowId: string | null };
+  | { type: "ask"; query: string; matchedFlowId: string | null }
+  /** A field was filled in "do" mode. The value itself is never included. */
+  | { type: "field:filled"; flowId: string; label: string; by: "voice" | "typed" | "preset" }
+  /** The user was asked to fill a field themselves (sensitive or unsupported). */
+  | { type: "field:manual"; flowId: string; label: string };
 
 export interface RaahiOptions {
   flows: Flow[];

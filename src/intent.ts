@@ -81,6 +81,11 @@ function scorePhrase(query: string[], phrase: string[]): number {
   return 0.75 * (hits / phrase.length) + 0.25 * (used / query.length);
 }
 
+/** How well free text matches a phrase, 0..1 (typo- and plural-tolerant). */
+export function scoreText(text: string, phrase: string): number {
+  return scorePhrase(tokenize(text), tokenize(phrase));
+}
+
 export interface Match {
   flow: Flow;
   score: number;

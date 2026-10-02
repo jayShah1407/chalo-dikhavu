@@ -40,6 +40,12 @@ export function css(color: string): string {
 .bubble.on { opacity: 1; transform: none; }
 .bubble .meta { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-size: 11px; color: #64748b; font-weight: 600; letter-spacing: .02em; }
 .bubble .text { white-space: pre-line; }
+.bubble .answer { display: flex; gap: 6px; margin-top: 10px; }
+.bubble .answer input {
+  flex: 1; min-width: 0; border: 1px solid #cbd5e1; border-radius: 10px; padding: 8px 10px; font-size: 14px; color: #0f172a; background: #fff;
+}
+.bubble .answer input:focus { outline: 2px solid ${color}; outline-offset: -1px; border-color: transparent; }
+.bubble .answer button { padding: 7px 12px; }
 .bubble .actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; flex-wrap: wrap; }
 
 button.b {

@@ -6,6 +6,7 @@ const PORT = Number(process.env.PORT ?? 4400);
 const files = {
   "/raahi.global.js": "dist/raahi.global.js",
   "/flows.js": "examples/tution-techer/flows.js",
+  "/bank-flows.js": "examples/bank-demo/flows.js",
 };
 
 createServer(async (req, res) => {

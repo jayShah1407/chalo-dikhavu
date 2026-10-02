@@ -29,6 +29,8 @@
     <a href="/student/teachers">Find Teachers</a>
     <a href="/student/enrollments">My Enrollments</a>
     <a href="/student/wallet">Wallet</a>
+    <strong style="display:block;padding:20px 12px 8px">Bank (demo)</strong>
+    <a href="/bank">Bharat Demo Bank</a>
   </aside>
   <main id="app"></main>
 
@@ -60,6 +62,29 @@
         </div>`,
       "/student/classroom": () => `<h1>Classroom</h1><button type="button">Join class</button>`,
       "/student/enrollments": () => `<h1>My Enrollments</h1>`,
+      "/bank": () => `
+        <h1>Bharat Demo Bank</h1><p>Banking made simple.</p>
+        <a class="card" style="max-width:260px" href="/bank/open-account"><b>Open an account</b><p>Savings, current or salary</p></a>`,
+      "/bank/open-account": () => `
+        <h1>Open a new account</h1>
+        <form id="account-form" class="box" style="max-width:520px">
+          <label for="fullName">Full name *</label><br /><input id="fullName" required /><br /><br />
+          <label for="mobile">Mobile number *</label><br /><input id="mobile" type="tel" required /><br /><br />
+          <label for="email">Email</label><br /><input id="email" type="email" /><br /><br />
+          <label for="dob">Date of birth *</label><br /><input id="dob" type="date" required /><br /><br />
+          <label for="pan">PAN *</label><br /><input id="pan" required /><br /><br />
+          <label for="accountType">Account type</label><br />
+          <select id="accountType"><option value="">Select…</option><option value="savings">Savings</option><option value="current">Current</option><option value="salary">Salary</option></select><br /><br />
+          <fieldset><legend>Gender</legend>
+            <label><input type="radio" name="gender" value="male" /> Male</label>
+            <label><input type="radio" name="gender" value="female" /> Female</label>
+            <label><input type="radio" name="gender" value="other" /> Other</label>
+          </fieldset><br />
+          <label for="password">Set a password *</label><br /><input id="password" type="password" required /><br /><br />
+          <label><input type="checkbox" id="terms" required /> I agree to the terms and conditions</label><br /><br />
+          <button type="submit">Open account</button>
+        </form>
+        <pre id="result"></pre>`,
       "/student/wallet": () => `
         <h1>Wallet</h1><p data-testid="student-wallet-balance" style="font-size:32px">QAR 120</p>
         <button type="button">Refunds (1)</button> <button type="button">Wallet history (3)</button>`,
@@ -71,6 +96,15 @@
       // Re-render with a fresh DOM each time, like React does, to exercise re-finding targets.
       document.getElementById("app").innerHTML = views[key]();
       document.querySelectorAll("aside a").forEach((a) => a.classList.toggle("active", a.pathname === path));
+      // Show what was submitted, so tests (and you) can see the form really got the values.
+      document.getElementById("account-form")?.addEventListener("submit", (e) => {
+        e.preventDefault();
+        const f = e.target;
+        document.getElementById("result").textContent = JSON.stringify({
+          fullName: f.fullName.value, mobile: f.mobile.value, email: f.email.value, dob: f.dob.value, pan: f.pan.value,
+          accountType: f.accountType.value, gender: f.gender.value, password: f.password.value ? "(set)" : "", terms: f.terms.checked,
+        });
+      });
     }
 
     // Client-side routing, like Next.js <Link>.
@@ -86,8 +120,11 @@
   </script>
   <script src="/raahi.global.js"></script>
   <script src="/flows.js"></script>
+  <script src="/bank-flows.js"></script>
   <script>
-    window.guide = Raahi.init({ flows: RAAHI_FLOWS, language: "en", languages: ["en", "hi"], color: "#0b5fd9" });
+    // ?quiet turns off text-to-speech (used by the automated tests).
+    const quiet = new URLSearchParams(location.search).has("quiet");
+    window.guide = Raahi.init({ flows: RAAHI_FLOWS, language: "en", languages: ["en", "hi"], color: "#0b5fd9", tts: !quiet });
   </script>
 </body>
 </html>
