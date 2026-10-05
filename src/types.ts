@@ -88,6 +88,11 @@ export interface FieldOptions {
   optional?: boolean;
   /** Leave this field out of a `form` step. */
   skip?: boolean;
+  /**
+   * Your own answer to "why is this needed?" for this field. Shown and spoken
+   * as-is, with no AI call, so it's free, instant and exactly your wording.
+   */
+  why?: LocalizedText;
 }
 
 export interface Flow {
@@ -96,6 +101,11 @@ export interface Flow {
   /** Phrases users might say or type to ask for this flow, any language. */
   keywords?: string[] | Record<string, string[]>;
   steps: Step[];
+  /**
+   * Background the AI may use to answer questions during this flow: what the
+   * process is for, why each document is needed, your policies. Plain text.
+   */
+  knowledge?: LocalizedText;
 }
 
 export type RunMode =
@@ -113,7 +123,39 @@ export type RaahiEvent =
   /** A field was filled in "do" mode. The value itself is never included. */
   | { type: "field:filled"; flowId: string; label: string; by: "voice" | "typed" | "preset" }
   /** The user was asked to fill a field themselves (sensitive or unsupported). */
-  | { type: "field:manual"; flowId: string; label: string };
+  | { type: "field:manual"; flowId: string; label: string }
+  /** A question was answered: from a field's `why`, or by the AI. */
+  | { type: "explain"; flowId: string | null; field: string | null; source: "why" | "ai" | "error" };
+
+/**
+ * What the SDK sends to your AI endpoint. It describes the page and the field,
+ * never what the user has typed into the form.
+ */
+export interface ExplainRequest {
+  question: string;
+  /** Language to answer in, e.g. "hi". */
+  lang: string;
+  page: { title: string; path: string };
+  flow: { id: string; title: string } | null;
+  /** Your site-wide `knowledge` plus the current flow's, as plain text. */
+  knowledge: string;
+  /** The field the user is on, if any. Labels only. */
+  field: { label: string; kind: string; required: boolean } | null;
+  /** Labels of the other fields in the form, for context. */
+  formFields: string[];
+}
+
+export interface AiOptions {
+  /**
+   * POST endpoint that takes an ExplainRequest and returns `{ answer }`.
+   * Either your own server (see `raahi/server`) or Raahi Cloud.
+   */
+  endpoint?: string;
+  /** Raahi Cloud project key (public, origin-restricted). Sent as a Bearer token. */
+  projectKey?: string;
+  /** Or answer in code instead of over HTTP. Takes precedence over `endpoint`. */
+  answer?: (req: ExplainRequest) => Promise<string>;
+}
 
 export interface RaahiOptions {
   flows: Flow[];
@@ -141,4 +183,11 @@ export interface RaahiOptions {
    */
   navigate?: (path: string) => void;
   onEvent?: (event: RaahiEvent) => void;
+  /**
+   * Answer users' questions ("what is KYC for?", "why do you need my PAN?")
+   * with an AI model. Without it, only fields' own `why` text is used.
+   */
+  ai?: AiOptions;
+  /** Site-wide background for the AI (who you are, support contacts, policies). */
+  knowledge?: LocalizedText;
 }

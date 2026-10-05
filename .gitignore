@@ -4,3 +4,5 @@ dev-extension/raahi.global.js
 *.tgz
 dev-extension/flows.js
 test/e2e-fail-*.png
+cloud/data/
+test/e2e-kyc-fail-*.png

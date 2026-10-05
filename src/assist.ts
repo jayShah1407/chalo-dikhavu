@@ -1,5 +1,6 @@
 import { parseAnswer, parseYesNo, type Parsed } from "./answers";
 import { isSubmitButton, type FieldInfo } from "./fields";
+import { isQuestion } from "./explain";
 import { clickElement, fillField } from "./fill";
 import { pick, ui } from "./i18n";
 import { listenOnce } from "./listen";
@@ -32,9 +33,17 @@ export interface AssistHost {
    * starting a new search, and `cancelAuto` stops the automatic listener first.
    */
   setAnswerSink(sink: ((text: string) => void) | null, cancelAuto?: () => void): void;
+  /** An AI is configured, so free-form questions can be answered. */
+  canExplain: boolean;
+  /**
+   * Answer a question about `field`: its own `why` text when that fits,
+   * otherwise the AI. Always resolves with something to say (errors included).
+   */
+  explain(question: string, field: FieldInfo, why: LocalizedText | undefined, preferWhy: boolean): Promise<string>;
 }
 
 type Answer = { text: string; typed: boolean };
+type AskResult = Answer | "skip" | "stop" | "why";
 
 /** Resolve via `done` from inside `setup`; runs teardown on resolve or when the flow is stopped. */
 function pending<T>(signal: AbortSignal, onAbort: T, setup: (done: (v: T) => void) => (() => void) | void): Promise<T> {
@@ -96,11 +105,13 @@ function askOnce(
   prompt: string,
   audio: LocalizedText | undefined,
   canSkip: boolean,
-): Promise<Answer | "skip" | "stop"> {
+  canAskWhy: boolean,
+): Promise<AskResult> {
   const { overlay, lang, signal } = host;
-  return pending<Answer | "skip" | "stop">(signal, "stop", (done) => {
+  return pending<AskResult>(signal, "stop", (done) => {
     const auto = new AbortController();
     const buttons: BubbleButton[] = [host.stopButton()];
+    if (canAskWhy) buttons.push({ label: ui(lang, "why"), onClick: () => done("why") });
     if (canSkip) buttons.push({ label: ui(lang, "skip"), onClick: () => done("skip") });
     const box: AnswerBox = {
       placeholder: ui(lang, "answerPlaceholder"),
@@ -164,19 +175,31 @@ function confirmValue(host: AssistHost, info: FieldInfo, meta: string, display: 
   });
 }
 
-/** Point at the field and wait for the user to fill it themselves. */
-function userFills(host: AssistHost, info: FieldInfo, meta: string, text: string): Promise<Outcome> {
+/**
+ * Point at the field and wait for the user to fill it themselves. They can still
+ * ask why it's needed (the question is about the field, never its value).
+ */
+async function userFills(host: AssistHost, info: FieldInfo, meta: string, text: string, why?: LocalizedText): Promise<Outcome> {
   const { overlay, lang, signal } = host;
   host.emit({ type: "field:manual", flowId: host.flowId, label: info.label });
-  return pending<Outcome>(signal, "stop", (done) => {
-    overlay.showStep(info.point, meta, text, [
-      host.stopButton(),
-      { label: ui(lang, "next"), primary: true, onClick: () => done("next") },
-    ]);
-    void overlay.moveCursor();
-    void host.speaker.play(text, undefined, lang);
-    return onUserChange(info.el, () => done("next"));
-  });
+  const canAskWhy = host.canExplain || why !== undefined;
+  let shown = text;
+  for (let asked = 0; ; asked++) {
+    const result = await pending<Outcome | "why">(signal, "stop", (done) => {
+      const buttons: BubbleButton[] = [host.stopButton()];
+      if (canAskWhy && asked < 3) buttons.push({ label: ui(lang, "why"), onClick: () => done("why") });
+      buttons.push({ label: ui(lang, "next"), primary: true, onClick: () => done("next") });
+      overlay.showStep(info.point, meta, shown, buttons);
+      void overlay.moveCursor();
+      void host.speaker.play(shown, undefined, lang);
+      return onUserChange(info.el, () => done("next"));
+    });
+    if (result !== "why") return result;
+    overlay.showStep(info.point, meta, ui(lang, "thinking"), [host.stopButton()]);
+    const explanation = await host.explain(ui(lang, "why"), info, why, true);
+    if (signal.aborted) return "stop";
+    shown = `${explanation}\n\n${text}`;
+  }
 }
 
 async function put(host: AssistHost, info: FieldInfo, meta: string, parsed: Extract<Parsed, { ok: true }>): Promise<void> {
@@ -200,17 +223,43 @@ export async function assistField(host: AssistHost, info: FieldInfo, opts: Field
     return signal.aborted ? "stop" : "next";
   }
 
-  if (opts.sensitive ?? info.sensitive) return userFills(host, info, meta, ui(lang, "typeYourself", { label: info.label }));
-  if (info.kind === "manual") return userFills(host, info, meta, ui(lang, "fillYourself", { label: info.label }));
+  if (opts.sensitive ?? info.sensitive) return userFills(host, info, meta, ui(lang, "typeYourself", { label: info.label }), opts.why);
+  if (info.kind === "manual") {
+    const upload = (info.el as HTMLInputElement).type === "file";
+    return userFills(host, info, meta, ui(lang, upload ? "uploadYourself" : "fillYourself", { label: info.label }), opts.why);
+  }
 
   const question = opts.ask ? pick(opts.ask, lang) : questionFor(info, lang);
   const canSkip = opts.optional ?? !info.required;
+  const canAskWhy = host.canExplain || opts.why !== undefined;
   let prompt = question;
-  for (let attempt = 0; attempt < 3; attempt++) {
-    const answer = await askOnce(host, info, meta, prompt, attempt === 0 ? opts.audio : undefined, canSkip);
+  let audio = opts.audio;
+  let explained = 0;
+  for (let attempt = 0; attempt < 3; ) {
+    const answer = await askOnce(host, info, meta, prompt, audio, canSkip, canAskWhy);
+    audio = undefined; // the recording matches the original question only
     if (answer === "stop") return "stop";
     if (answer === "skip") return "next";
 
+    // "Why is this needed?" — tapped, or asked instead of answering.
+    const tapped = answer === "why";
+    const asked = tapped ? ui(lang, "why") : isQuestion(answer.text) ? answer.text : null;
+    if (asked !== null) {
+      // Cap explanations per field: each one can be an AI call that costs tokens.
+      if (explained++ < 5) {
+        host.overlay.showStep(info.point, meta, ui(lang, "thinking"), [host.stopButton()]);
+        const explanation = await host.explain(asked, info, opts.why, tapped);
+        if (signal.aborted) return "stop";
+        // Explain, then put the same question again so the form carries on.
+        prompt = `${explanation}\n\n${question}`;
+      } else {
+        prompt = question;
+      }
+      continue;
+    }
+    if (tapped) continue; // unreachable; narrows `answer` for TypeScript
+
+    attempt++;
     const parsed = parseAnswer(info, answer.text, answer.typed);
     if (!parsed.ok) {
       prompt = `${ui(lang, "retry")}\n\n${question}`;
@@ -229,7 +278,7 @@ export async function assistField(host: AssistHost, info: FieldInfo, opts: Field
     host.emit({ type: "field:filled", flowId: host.flowId, label: info.label, by: answer.typed ? "typed" : "voice" });
     return signal.aborted ? "stop" : "next";
   }
-  return userFills(host, info, meta, ui(lang, "fillYourself", { label: info.label }));
+  return userFills(host, info, meta, ui(lang, "fillYourself", { label: info.label }), opts.why);
 }
 
 /**

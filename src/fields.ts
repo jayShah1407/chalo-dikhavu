@@ -145,10 +145,18 @@ export function describeField(input: Element): FieldInfo {
   else if (type === "date") kind = "date";
 
   const hints = `${el.name ?? ""} ${el.id} ${autocomplete} ${label}`.toLowerCase();
-  if (kind === "text") {
+  // The browser's autocomplete hint is the most reliable signal, so it wins over
+  // label words: "Full name (as on PAN card)" is a name, not a PAN.
+  const AUTOCOMPLETE_KIND: Record<string, FieldKind> = {
+    name: "name", "given-name": "name", "family-name": "name", "additional-name": "name",
+    email: "email", tel: "phone", "tel-national": "phone", "postal-code": "pincode", bday: "date",
+  };
+  if (kind === "text" && AUTOCOMPLETE_KIND[autocomplete]) kind = AUTOCOMPLETE_KIND[autocomplete];
+  else if (kind === "text") {
     if (/e-?mail/.test(hints)) kind = "email";
     else if (/(phone|mobile|\btel\b|contact no|whatsapp)/.test(hints)) kind = "phone";
     else if (/(pin\s*code|postal|\bzip\b)/.test(hints)) kind = "pincode";
+    else if (/(full name|first name|last name|middle name|surname|father|spouse|mother)/.test(hints)) kind = "name";
     else if (/(\bpan\b|pan card|pan number|pan no)/.test(hints)) kind = "pan";
     else if (/(date of birth|\bdob\b|birth\s*date|bday)/.test(hints)) kind = "date";
     else if (/^(name|given-name|family-name|additional-name)$/.test(autocomplete) || /(full name|first name|last name|middle name|surname|\bname\b)/.test(hints)) {

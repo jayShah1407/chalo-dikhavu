@@ -119,6 +119,48 @@ Tweak individual fields with `fields`, keyed by CSS selector:
 
 The same options (`ask`, `value`, `sensitive`, `optional`) also work on a single `{ target, action: "fill" }` step.
 
+## "Why is this needed?": answers from your knowledge, spoken
+
+Users stop on complex forms because they don't know *why* something is asked ("Why do you need my PAN?", "Is it safe to give Aadhaar?"). With Raahi:
+
+- every question bubble has a **Why is this needed?** button, and
+- users can just *ask* instead of answering, by voice or typing ("PAN kyu chahiye?"). Raahi explains, speaks the answer, then repeats the question so the form carries on.
+- In the help panel, "what is KYC for?" gets an answer, while "how do I do KYC?" starts the guide.
+
+Answers come from, in order:
+1. **Your own `why` text** on a field. It's exact, pre-approved wording, free and instant:
+   ```ts
+   { form: "#kyc-identity", fields: { "#pan": { why: { en: "Income-tax rules require a PAN…", hi: "…" } } } }
+   ```
+2. **An AI model**, grounded in the `knowledge` text you provide for the site and each flow:
+   ```ts
+   init({ flows, knowledge: "About us… support number…", ai: { endpoint: "/api/explain" } })
+   // and on a flow: { id: "complete-kyc", knowledge: "What KYC is, why each document is needed…", steps: [...] }
+   ```
+
+**What is sent to the AI:** the question, the page title and path, the current field's *label*, the labels of the other fields, and your knowledge text. **Never the values the user typed.** Your compliance team can review the `ExplainRequest` type for the complete list.
+
+### Option A: your own backend and your own Anthropic key
+
+```ts
+// server (Node). npm install @anthropic-ai/sdk
+import http from "node:http";
+import { createExplainer, createNodeHandler } from "raahi/server";
+
+const explain = createExplainer({ instructions: "You help customers of Example Bank." }); // reads ANTHROPIC_API_KEY
+http.createServer(createNodeHandler(explain, { allowOrigins: ["https://www.examplebank.in"] })).listen(8080);
+```
+
+The handler also works as Express middleware. By default it uses Claude Opus 5.5 at low effort, which suits short spoken answers. The fixed rules and your knowledge text are prompt-cached, so repeat questions cost much less. It also turns on Anthropic's server-side refusal fallback: if the model declines a question, it's retried on a fallback model automatically. The API key never reaches the browser.
+
+### Option B: Raahi Cloud (hosted)
+
+```ts
+init({ flows, ai: { endpoint: "https://<raahi cloud>/v1/explain", projectKey: "rh_pub_…" } })
+```
+
+The project key is public and only works from your allowed origins. Usage is metered in tokens, and each project gets a free allowance (`freeTokens`) before billing. The prototype server is in `cloud/` (`npm run cloud`; see `cloud/server.mjs`). It isn't hosted anywhere yet.
+
 ## API
 
 ```ts
@@ -130,7 +172,7 @@ guide.setLanguage("hi");
 guide.destroy();
 ```
 
-The `onEvent` option receives `flow:start`, `flow:end`, `step:show`, `step:missing`, `ask`, `field:filled` and `field:manual`. Use these for analytics, for example which questions have no guide yet, or where users stop. Field events include the field's label but **never its value**.
+The `onEvent` option receives `flow:start`, `flow:end`, `step:show`, `step:missing`, `ask`, `field:filled`, `field:manual` and `explain`. Use these for analytics, for example which questions have no guide yet, or where users stop. Field events include the field's label but **never its value**.
 
 ## Development
 
@@ -139,6 +181,9 @@ npm install
 npm test               # unit tests
 npm run build
 npm run playground     # demo SPA: http://localhost:4400/student and /bank (account-opening demo)
+npm run kyc            # realistic bank KYC demo: http://localhost:4500 (offline AI answers unless ANTHROPIC_API_KEY is set)
+npm run cloud          # Raahi Cloud prototype on :4600 (RAAHI_MOCK_AI=1 for no key); open http://localhost:4500/?cloud
+node test/e2e-kyc.mjs  # full KYC journey in real Chrome
 npm run e2e            # real-browser test against the playground (needs Chrome)
 ```
 

@@ -3,7 +3,8 @@ import { defineConfig } from "tsup";
 export default defineConfig([
   {
     // npm consumers: ESM + CJS with type declarations.
-    entry: { index: "src/index.ts" },
+    entry: { index: "src/index.ts", server: "src/server/index.ts" },
+    external: ["@anthropic-ai/sdk"],
     format: ["esm", "cjs"],
     dts: true,
     clean: true,

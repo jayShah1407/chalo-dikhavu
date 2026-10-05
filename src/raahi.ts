@@ -1,13 +1,14 @@
 import { assistClick, assistField, type AssistHost } from "./assist";
-import { collectFields, describeField, selectorFor, submitButtonOf } from "./fields";
+import { buildRequest, callAi, wantsExplanation } from "./explain";
+import { collectFields, describeField, selectorFor, submitButtonOf, type FieldInfo } from "./fields";
 import { findNow, waitFor } from "./finder";
 import { pick, ui } from "./i18n";
-import { flowTitle, resolve } from "./intent";
+import { flowTitle, rankFlows, resolve } from "./intent";
 import { canListen, Listener } from "./listen";
 import { Overlay, type BubbleButton } from "./overlay";
 import { isStaticPath, matchPath } from "./paths";
 import { buttonLabel, guideTextFor } from "./prompts";
-import type { Flow, RaahiEvent, RaahiOptions, RunMode, Step } from "./types";
+import type { Flow, LocalizedText, RaahiEvent, RaahiOptions, RunMode, Step } from "./types";
 import { Speaker } from "./voice";
 
 const STATE_KEY = "raahi:run";
@@ -61,7 +62,7 @@ function canDo(flow: Flow): boolean {
 }
 
 export class Raahi {
-  private readonly opts: Required<Omit<RaahiOptions, "onEvent" | "navigate">> & Pick<RaahiOptions, "onEvent" | "navigate">;
+  private readonly opts: Required<Omit<RaahiOptions, "onEvent" | "navigate" | "ai" | "knowledge">> & Pick<RaahiOptions, "onEvent" | "navigate" | "ai" | "knowledge">;
   private overlay: Overlay | null = null;
   private readonly speaker: Speaker;
   private readonly listener: Listener;
@@ -150,6 +151,11 @@ export class Raahi {
     this.emit({ type: "ask", query, matchedFlowId: result.kind === "start" ? result.flow.id : null });
     const overlay = this.overlay;
     if (!overlay) return;
+    // "What is KYC for?" wants an answer, not a walkthrough (that's "how do I do KYC").
+    if (this.opts.ai && wantsExplanation(query)) {
+      void this.answerInPanel(query);
+      return;
+    }
     if (result.kind === "start") {
       this.start(result.flow.id);
       return;
@@ -162,6 +168,23 @@ export class Raahi {
       overlay.setMessage(`“${query}” — ${ui(this.lang, "noMatch")}`);
       this.showPopular();
     }
+  }
+
+  /** Answer a free-form question in the help panel, then offer the most related guide. */
+  private async answerInPanel(query: string): Promise<void> {
+    const overlay = this.overlay!;
+    if (!this.current) overlay.hideStep(); // e.g. a lingering "All done!" bubble
+    overlay.togglePanel(true);
+    overlay.setMessage(`“${query}” — ${ui(this.lang, "thinking")}`);
+    const ranked = rankFlows(query, this.opts.flows);
+    const related = this.current?.flow ?? ranked[0]?.flow ?? null;
+    const answer = await this.explain(query, related, null, undefined, false);
+    if (!this.overlay) return;
+    overlay.setMessage(answer);
+    void this.speaker.play(answer, undefined, this.lang);
+    const offer = ranked.filter((m) => m.score >= 0.35).slice(0, 3).map((m) => m.flow);
+    if (offer.length) overlay.setFlows(ui(this.lang, "related"), offer.map((f) => ({ id: f.id, title: flowTitle(f, this.lang) })));
+    else this.showPopular();
   }
 
   setLanguage(lang: string): void {
@@ -359,7 +382,41 @@ export class Raahi {
         this.answerSink = sink;
         this.cancelAutoListen = cancelAuto ?? null;
       },
+      canExplain: !!this.opts.ai,
+      explain: (question, field, why, preferWhy) => this.explain(question, flow, field, why, preferWhy, signal),
     };
+  }
+
+  /**
+   * Answer a question: the field's own `why` text when it fits (free, exact
+   * wording), otherwise the AI. Never throws; failures become a polite message.
+   */
+  private async explain(
+    question: string,
+    flow: Flow | null,
+    field: FieldInfo | null,
+    why: LocalizedText | undefined,
+    preferWhy: boolean,
+    signal?: AbortSignal,
+  ): Promise<string> {
+    const base = { flowId: flow?.id ?? null, field: field?.label ?? null };
+    if (why !== undefined && (preferWhy || !this.opts.ai)) {
+      this.emit({ type: "explain", ...base, source: "why" });
+      return pick(why, this.lang);
+    }
+    if (!this.opts.ai) return ui(this.lang, "noWhy");
+    try {
+      const form = field?.el.closest("form");
+      const formFields = form ? collectFields(form).map((el) => describeField(el)) : [];
+      const req = buildRequest(question, this.lang, flow, field, formFields, this.opts.knowledge);
+      const answer = await callAi(this.opts.ai, req, signal);
+      this.emit({ type: "explain", ...base, source: "ai" });
+      return answer;
+    } catch (err) {
+      if (!signal?.aborted) console.warn("raahi: AI answer failed", err);
+      this.emit({ type: "explain", ...base, source: "error" });
+      return ui(this.lang, "aiError");
+    }
   }
 
   private stopButton(): BubbleButton {

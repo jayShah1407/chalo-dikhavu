@@ -6,9 +6,12 @@ function inSentence(label: string, lang: string): string {
   if (lang !== "en") return label;
   return label
     .split(" ")
-    .map((w) => (/^[A-Z0-9]{2,}$/.test(w) ? w : w.toLowerCase()))
+    .map((w) => (/^[^A-Za-z0-9]*[A-Z0-9]{2,}[^A-Za-z0-9]*$/.test(w) ? w : w.toLowerCase()))
     .join(" ");
 }
+
+/** Labels like "Are you a politically exposed person (PEP)?" are already the question. */
+const isQuestionLabel = (label: string) => /[?？]\s*$/.test(label);
 
 function short(text: string): string {
   return text.length > 40 ? text.slice(0, 38).trimEnd() + "…" : text;
@@ -19,8 +22,10 @@ export function questionFor(info: FieldInfo, lang: string): string {
   const label = inSentence(info.label, lang);
   if (info.kind === "choice") {
     const options = info.options.slice(0, 5).map((o) => short(o.label)).join(", ");
+    if (isQuestionLabel(info.label)) return `${info.label} ${ui(lang, "youCanSay", { options })}`;
     return ui(lang, "askChoice", { label, options });
   }
+  if (isQuestionLabel(info.label)) return info.label;
   if (info.kind === "check") return ui(lang, "askCheck", { label: info.label });
   return ui(lang, "askText", { label });
 }

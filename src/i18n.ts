@@ -74,7 +74,15 @@ type UiKey =
   | "enterHere"
   | "chooseHere"
   | "tickHere"
-  | "clickHere";
+  | "clickHere"
+  | "why"
+  | "thinking"
+  | "aiError"
+  | "continue"
+  | "noWhy"
+  | "youCanSay"
+  | "related"
+  | "uploadYourself";
 
 const UI: Record<string, Record<UiKey, string>> = {
   en: {
@@ -112,6 +120,14 @@ const UI: Record<string, Record<UiKey, string>> = {
     chooseHere: "Choose {label} here.",
     tickHere: "Tick “{label}” if it applies.",
     clickHere: "Click “{label}”.",
+    why: "Why is this needed?",
+    thinking: "Let me check…",
+    aiError: "Sorry, I couldn't get an answer right now. Please try again, or contact support.",
+    continue: "Continue",
+    noWhy: "I don't have an explanation for this yet. You can ask support.",
+    youCanSay: "You can say: {options}.",
+    related: "Related guides",
+    uploadYourself: "Please upload “{label}” yourself, then press Next.",
   },
   hi: {
     help: "मदद चाहिए?",
@@ -148,6 +164,14 @@ const UI: Record<string, Record<UiKey, string>> = {
     chooseHere: "{label} यहाँ चुनें।",
     tickHere: "अगर लागू हो तो “{label}” पर टिक करें।",
     clickHere: "“{label}” पर क्लिक करें।",
+    why: "यह क्यों ज़रूरी है?",
+    thinking: "एक पल, देखता हूँ…",
+    aiError: "माफ़ करें, अभी जवाब नहीं मिल पाया। फिर से कोशिश करें या सपोर्ट से संपर्क करें।",
+    continue: "आगे बढ़ें",
+    noWhy: "इसके लिए अभी कोई जानकारी नहीं है। आप सपोर्ट से पूछ सकते हैं।",
+    youCanSay: "आप बोल सकते हैं: {options}।",
+    related: "संबंधित गाइड",
+    uploadYourself: "कृपया “{label}” खुद अपलोड करें, फिर “आगे” दबाएँ।",
   },
   gu: {
     help: "મદદ જોઈએ?",
@@ -184,6 +208,14 @@ const UI: Record<string, Record<UiKey, string>> = {
     chooseHere: "{label} અહીં પસંદ કરો.",
     tickHere: "લાગુ પડે તો “{label}” પર ટિક કરો.",
     clickHere: "“{label}” પર ક્લિક કરો.",
+    why: "આ કેમ જરૂરી છે?",
+    thinking: "એક પળ, જોઉં છું…",
+    aiError: "માફ કરશો, અત્યારે જવાબ મળી શક્યો નહીં. ફરી પ્રયાસ કરો અથવા સપોર્ટનો સંપર્ક કરો.",
+    continue: "આગળ વધો",
+    noWhy: "આ માટે હજી કોઈ માહિતી નથી. તમે સપોર્ટને પૂછી શકો.",
+    youCanSay: "તમે બોલી શકો: {options}.",
+    related: "સંબંધિત ગાઇડ",
+    uploadYourself: "કૃપા કરીને “{label}” જાતે અપલોડ કરો, પછી “આગળ” દબાવો.",
   },
 };
 

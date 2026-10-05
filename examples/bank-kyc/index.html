@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Bharat Demo Bank — Complete your KYC</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+Devanagari:wght@400;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --navy: #0b2e59; --blue: #1356c4; --blue-soft: #e8f0fd; --teal: #0f8b7d;
+      --ink: #0f172a; --muted: #5b6b82; --line: #dde3ec; --bg: #f4f6fa; --white: #fff;
+      --warn-bg: #fff7e6; --warn: #8a5a00; --ok: #0f7a3d; --ok-bg: #e7f6ee; --danger: #b42318;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: Inter, "Noto Sans Devanagari", system-ui, sans-serif; color: var(--ink); background: var(--bg); line-height: 1.5; }
+    a { color: var(--blue); }
+
+    .demo-banner { background: #1f2937; color: #f9fafb; text-align: center; font-size: 12.5px; padding: 6px 16px; }
+    header.top { background: var(--white); border-bottom: 1px solid var(--line); }
+    .bar { max-width: 1120px; margin: 0 auto; padding: 14px 20px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+    .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; color: var(--navy); text-decoration: none; font-size: 18px; }
+    .brand .mark { width: 34px; height: 34px; border-radius: 9px; background: linear-gradient(135deg, var(--navy), var(--blue)); color: #fff; display: grid; place-items: center; font-size: 15px; }
+    nav.links { display: flex; gap: 22px; font-size: 14px; }
+    nav.links a { color: var(--muted); text-decoration: none; }
+    .user { font-size: 13px; color: var(--muted); }
+
+    main { max-width: 1120px; margin: 0 auto; padding: 28px 20px 80px; }
+    h1 { font-size: 26px; margin: 0 0 4px; color: var(--navy); }
+    .sub { color: var(--muted); margin: 0 0 24px; }
+
+    /* home */
+    .hero { display: grid; grid-template-columns: 1.3fr 1fr; gap: 24px; align-items: stretch; }
+    .card { background: var(--white); border: 1px solid var(--line); border-radius: 16px; padding: 22px; }
+    .alert { display: flex; gap: 14px; align-items: flex-start; background: var(--warn-bg); border: 1px solid #f3d9a4; border-radius: 14px; padding: 16px 18px; margin-bottom: 20px; color: var(--warn); }
+    .alert strong { color: #5c3d00; }
+    .btn { display: inline-flex; align-items: center; gap: 8px; border: 0; border-radius: 10px; padding: 11px 20px; font: inherit; font-weight: 600; cursor: pointer; text-decoration: none; }
+    .btn.primary { background: var(--blue); color: #fff; }
+    .btn.primary:hover { background: #0e47a6; }
+    .btn.ghost { background: transparent; color: var(--blue); border: 1px solid #bcd0f3; }
+    .stat { font-size: 13px; color: var(--muted); }
+    .stat b { display: block; font-size: 22px; color: var(--ink); }
+    .accounts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 20px; }
+
+    /* wizard */
+    .wizard { display: grid; grid-template-columns: 250px 1fr; gap: 24px; align-items: start; }
+    ol.steps { list-style: none; margin: 0; padding: 18px; background: var(--white); border: 1px solid var(--line); border-radius: 16px; position: sticky; top: 16px; }
+    ol.steps li { display: flex; gap: 12px; align-items: center; padding: 10px 6px; font-size: 14px; color: var(--muted); }
+    ol.steps li .n { width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--line); display: grid; place-items: center; font-size: 12px; font-weight: 700; flex: none; }
+    ol.steps li.active { color: var(--ink); font-weight: 600; }
+    ol.steps li.active .n { border-color: var(--blue); color: var(--blue); }
+    ol.steps li.done .n { background: var(--teal); border-color: var(--teal); color: #fff; }
+
+    form.step { display: none; }
+    form.step.current { display: block; }
+    .step-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
+    .step-head h2 { margin: 0; font-size: 20px; color: var(--navy); }
+    .step-head span { font-size: 12.5px; color: var(--muted); }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px 20px; margin-top: 18px; }
+    .full { grid-column: 1 / -1; }
+    .field label, fieldset legend { display: block; font-size: 13.5px; font-weight: 600; margin-bottom: 6px; color: #23324a; }
+    .req { color: var(--danger); }
+    .hint { font-size: 12px; color: var(--muted); margin-top: 5px; }
+    input[type=text], input[type=tel], input[type=email], input[type=date], select {
+      width: 100%; padding: 10px 12px; border: 1px solid #c8d1de; border-radius: 9px; font: inherit; font-size: 14.5px; background: #fff; color: var(--ink);
+    }
+    input:focus, select:focus { outline: 2px solid #9cbcf2; outline-offset: 0; border-color: var(--blue); }
+    input[type=file] { font: inherit; font-size: 13.5px; }
+    fieldset { border: 1px solid var(--line); border-radius: 12px; padding: 12px 16px 14px; margin: 0; }
+    fieldset .opts { display: flex; flex-wrap: wrap; gap: 8px 22px; }
+    fieldset label.opt { font-weight: 500; display: inline-flex; gap: 8px; align-items: center; font-size: 14px; margin: 0; }
+    .check { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; }
+    .check input { margin-top: 4px; }
+    .note { background: var(--blue-soft); border-radius: 10px; padding: 10px 14px; font-size: 13px; color: #24406e; margin-top: 18px; }
+    .actions { display: flex; justify-content: space-between; align-items: center; margin-top: 26px; padding-top: 18px; border-top: 1px solid var(--line); }
+    .upload { border: 1.5px dashed #b7c4d8; border-radius: 12px; padding: 14px; background: #fafcff; }
+    dl.review { display: grid; grid-template-columns: 220px 1fr; gap: 8px 16px; margin: 18px 0 0; font-size: 14px; }
+    dl.review dt { color: var(--muted); }
+    dl.review dd { margin: 0; font-weight: 500; }
+    .success { text-align: center; padding: 40px 24px; }
+    .success .tick { width: 64px; height: 64px; border-radius: 50%; background: var(--ok-bg); color: var(--ok); display: grid; place-items: center; font-size: 30px; margin: 0 auto 14px; }
+    pre#submitted { text-align: left; background: #0f172a; color: #e2e8f0; padding: 14px; border-radius: 10px; font-size: 12px; overflow: auto; }
+    footer { text-align: center; font-size: 12px; color: var(--muted); padding: 24px; }
+
+    @media (max-width: 860px) {
+      .hero, .wizard { grid-template-columns: 1fr; }
+      ol.steps { position: static; display: flex; overflow-x: auto; gap: 4px; }
+      ol.steps li span.t { display: none; }
+      .grid2, .accounts { grid-template-columns: 1fr; }
+      nav.links { display: none; }
+      dl.review { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="demo-banner">Demo site for testing Raahi. Bharat Demo Bank is fictional. Don't enter real personal details.</div>
+  <header class="top">
+    <div class="bar">
+      <a class="brand" href="/"><span class="mark">B</span> Bharat Demo Bank</a>
+      <nav class="links"><a href="/">Accounts</a><a href="/">Payments</a><a href="/">Cards</a><a href="/">Support</a></nav>
+      <span class="user">Welcome, Customer</span>
+    </div>
+  </header>
+
+  <main id="app"></main>
+  <footer>© 2026 Bharat Demo Bank (fictional). For demonstration only.</footer>
+
+  <template id="home">
+    <h1>Good afternoon</h1>
+    <p class="sub">Here's an overview of your accounts.</p>
+    <div class="alert" role="status">
+      <span style="font-size:22px">⚠️</span>
+      <div>
+        <strong>Your KYC is pending.</strong> To keep using your account without limits, complete your KYC (Know Your Customer) verification. It takes about 5 minutes.
+        <div style="margin-top:12px"><a class="btn primary" href="/kyc">Complete your KYC</a></div>
+      </div>
+    </div>
+    <div class="hero">
+      <div class="card">
+        <div class="stat">Savings account •••• 4821<b>₹ 1,24,560.00</b></div>
+        <p class="stat" style="margin-top:14px">Some services are limited until KYC is complete.</p>
+      </div>
+      <div class="card">
+        <div class="stat">Need help?</div>
+        <p style="margin:6px 0 0;font-size:14px">Press <b>Need help?</b> at the bottom right, or hold <kbd>Space</kbd> and ask, for example <i>“I want to complete my KYC”</i> or <i>“KYC kyu zaroori hai?”</i></p>
+      </div>
+    </div>
+    <div class="accounts">
+      <div class="card"><div class="stat">Fixed deposits<b>₹ 2,00,000</b></div></div>
+      <div class="card"><div class="stat">Credit card<b>₹ 8,240 due</b></div></div>
+      <div class="card"><div class="stat">Rewards<b>1,240 pts</b></div></div>
+    </div>
+  </template>
+
+  <template id="kyc">
+    <h1>Complete your KYC</h1>
+    <p class="sub">Required by RBI for every bank account. Your details are encrypted and used only for verification.</p>
+    <div class="wizard">
+      <ol class="steps" id="stepper">
+        <li data-step="0"><span class="n">1</span><span class="t">Personal details</span></li>
+        <li data-step="1"><span class="n">2</span><span class="t">Identity &amp; declarations</span></li>
+        <li data-step="2"><span class="n">3</span><span class="t">Address</span></li>
+        <li data-step="3"><span class="n">4</span><span class="t">Documents &amp; consent</span></li>
+        <li data-step="4"><span class="n">5</span><span class="t">Review &amp; submit</span></li>
+      </ol>
+
+      <div class="card">
+        <form class="step" id="kyc-personal" novalidate>
+          <div class="step-head"><h2>Personal details</h2><span>Step 1 of 5</span></div>
+          <div class="grid2">
+            <div class="field full"><label for="fullName">Full name (as on PAN card) <span class="req">*</span></label><input id="fullName" type="text" autocomplete="name" required /></div>
+            <div class="field"><label for="dob">Date of birth <span class="req">*</span></label><input id="dob" type="date" required /></div>
+            <div class="field"><label for="maritalStatus">Marital status</label>
+              <select id="maritalStatus"><option value="">Select</option><option value="single">Single</option><option value="married">Married</option><option value="other">Other</option></select>
+            </div>
+            <fieldset class="full"><legend>Gender <span class="req">*</span></legend>
+              <div class="opts">
+                <label class="opt"><input type="radio" name="gender" value="male" required /> Male</label>
+                <label class="opt"><input type="radio" name="gender" value="female" /> Female</label>
+                <label class="opt"><input type="radio" name="gender" value="transgender" /> Transgender</label>
+              </div>
+            </fieldset>
+            <div class="field full"><label for="parentName">Father's or spouse's name <span class="req">*</span></label><input id="parentName" type="text" required /></div>
+            <div class="field"><label for="mobile">Mobile number <span class="req">*</span></label><input id="mobile" type="tel" autocomplete="tel" required /><div class="hint">We'll send updates on this number.</div></div>
+            <div class="field"><label for="email">Email</label><input id="email" type="email" autocomplete="email" /></div>
+          </div>
+          <div class="actions"><span></span><button class="btn primary" type="submit">Continue</button></div>
+        </form>
+
+        <form class="step" id="kyc-identity" novalidate>
+          <div class="step-head"><h2>Identity &amp; declarations</h2><span>Step 2 of 5</span></div>
+          <div class="grid2">
+            <div class="field"><label for="pan">PAN <span class="req">*</span></label><input id="pan" type="text" required /><div class="hint">10 characters, e.g. ABCDE1234F</div></div>
+            <div class="field"><label for="aadhaar">Aadhaar number (optional)</label><input id="aadhaar" type="text" inputmode="numeric" /><div class="hint">Voluntary. Speeds up verification.</div></div>
+            <div class="field"><label for="occupation">Occupation <span class="req">*</span></label>
+              <select id="occupation" required><option value="">Select</option><option value="salaried">Salaried</option><option value="self-employed">Self-employed professional</option><option value="business">Business</option><option value="student">Student</option><option value="retired">Retired</option><option value="homemaker">Homemaker</option></select>
+            </div>
+            <div class="field"><label for="income">Annual income <span class="req">*</span></label>
+              <select id="income" required><option value="">Select</option><option value="lt2.5">Below ₹2.5 lakh</option><option value="2.5-5">₹2.5 to 5 lakh</option><option value="5-10">₹5 to 10 lakh</option><option value="10-25">₹10 to 25 lakh</option><option value="gt25">Above ₹25 lakh</option></select>
+            </div>
+            <fieldset class="full"><legend>Are you a politically exposed person (PEP)? <span class="req">*</span></legend>
+              <div class="opts">
+                <label class="opt"><input type="radio" name="pep" value="no" required /> No</label>
+                <label class="opt"><input type="radio" name="pep" value="yes" /> Yes</label>
+              </div>
+            </fieldset>
+            <fieldset class="full"><legend>Are you a tax resident of any country other than India? <span class="req">*</span></legend>
+              <div class="opts">
+                <label class="opt"><input type="radio" name="foreignTax" value="no" required /> No</label>
+                <label class="opt"><input type="radio" name="foreignTax" value="yes" /> Yes</label>
+              </div>
+            </fieldset>
+          </div>
+          <div class="note">The two declarations above are required under anti-money-laundering rules and FATCA/CRS tax reporting.</div>
+          <div class="actions"><button class="btn ghost" type="button" data-back>Back</button><button class="btn primary" type="submit">Continue</button></div>
+        </form>
+
+        <form class="step" id="kyc-address" novalidate>
+          <div class="step-head"><h2>Address</h2><span>Step 3 of 5</span></div>
+          <div class="grid2">
+            <div class="field full"><label for="addr1">Address line 1 <span class="req">*</span></label><input id="addr1" type="text" autocomplete="address-line1" required /><div class="hint">House / flat number, building, street</div></div>
+            <div class="field full"><label for="addr2">Address line 2</label><input id="addr2" type="text" autocomplete="address-line2" /></div>
+            <div class="field"><label for="city">City <span class="req">*</span></label><input id="city" type="text" autocomplete="address-level2" required /></div>
+            <div class="field"><label for="state">State <span class="req">*</span></label>
+              <select id="state" required><option value="">Select</option><option>Gujarat</option><option>Maharashtra</option><option>Delhi</option><option>Karnataka</option><option>Tamil Nadu</option><option>Uttar Pradesh</option><option>Rajasthan</option><option>West Bengal</option><option>Other</option></select>
+            </div>
+            <div class="field"><label for="pincode">PIN code <span class="req">*</span></label><input id="pincode" type="text" inputmode="numeric" required /></div>
+            <div class="field full"><label class="check"><input id="sameAddress" type="checkbox" /> My correspondence address is the same as above</label></div>
+          </div>
+          <div class="actions"><button class="btn ghost" type="button" data-back>Back</button><button class="btn primary" type="submit">Continue</button></div>
+        </form>
+
+        <form class="step" id="kyc-documents" novalidate>
+          <div class="step-head"><h2>Documents &amp; consent</h2><span>Step 4 of 5</span></div>
+          <div class="grid2">
+            <div class="field full upload"><label for="panCopy">Upload PAN card <span class="req">*</span></label><input id="panCopy" type="file" accept="image/*,application/pdf" required /><div class="hint">JPG, PNG or PDF, up to 5 MB</div></div>
+            <div class="field full upload"><label for="signature">Upload your signature</label><input id="signature" type="file" accept="image/*" /><div class="hint">Sign on white paper and take a clear photo</div></div>
+            <div class="field full"><label class="check"><input id="consent" type="checkbox" required /> I agree that Bharat Demo Bank may verify my details with the issuing authorities for KYC</label></div>
+          </div>
+          <div class="actions"><button class="btn ghost" type="button" data-back>Back</button><button class="btn primary" type="submit">Continue</button></div>
+        </form>
+
+        <form class="step" id="kyc-review" novalidate>
+          <div class="step-head"><h2>Review &amp; submit</h2><span>Step 5 of 5</span></div>
+          <p class="sub" style="margin:8px 0 0">Please check your details before submitting.</p>
+          <dl class="review" id="reviewList"></dl>
+          <div class="field full" style="margin-top:18px"><label class="check"><input id="declaration" type="checkbox" required /> I declare that the information given above is true and complete</label></div>
+          <div class="actions"><button class="btn ghost" type="button" data-back>Back</button><button class="btn primary" type="submit">Submit KYC</button></div>
+        </form>
+      </div>
+    </div>
+  </template>
+
+  <template id="done">
+    <div class="card success">
+      <div class="tick">✓</div>
+      <h1>KYC submitted</h1>
+      <p class="sub">Reference number <b id="ref"></b>. We'll verify your details and update you by SMS.</p>
+      <a class="btn ghost" href="/">Back to accounts</a>
+      <p class="stat" style="margin-top:24px">What the form received (demo only):</p>
+      <pre id="submitted"></pre>
+    </div>
+  </template>
+
+  <script>
+    // A small single-page app: "/", "/kyc", "/kyc/done". Values live in memory only.
+    const app = document.getElementById("app");
+    const data = {};
+    const FIELDS = {
+      fullName: "Full name", dob: "Date of birth", gender: "Gender", maritalStatus: "Marital status",
+      parentName: "Father's or spouse's name", mobile: "Mobile number", email: "Email", pan: "PAN",
+      aadhaar: "Aadhaar", occupation: "Occupation", income: "Annual income", pep: "PEP", foreignTax: "Foreign tax resident",
+      addr1: "Address line 1", addr2: "Address line 2", city: "City", state: "State", pincode: "PIN code",
+      sameAddress: "Same correspondence address", panCopy: "PAN card", signature: "Signature", consent: "Consent",
+    };
+
+    function render() {
+      const path = location.pathname.replace(/\/$/, "") || "/";
+      const id = path === "/kyc" ? "kyc" : path === "/kyc/done" ? "done" : "home";
+      app.replaceChildren(document.getElementById(id).content.cloneNode(true));
+      if (id === "kyc") setupWizard();
+      if (id === "done") {
+        document.getElementById("ref").textContent = "KYC" + String(Date.now()).slice(-8);
+        const shown = { ...data, aadhaar: data.aadhaar ? "XXXX XXXX " + data.aadhaar.slice(-4) : "" };
+        document.getElementById("submitted").textContent = JSON.stringify(shown, null, 2);
+      }
+      window.scrollTo(0, 0);
+    }
+
+    function go(path) {
+      history.pushState(null, "", path);
+      render();
+    }
+
+    function collect(form) {
+      for (const el of form.elements) {
+        if (!el.id && !el.name) continue;
+        const key = el.type === "radio" ? el.name : el.id;
+        if (el.type === "radio") { if (el.checked) data[key] = el.value; }
+        else if (el.type === "checkbox") data[key] = el.checked;
+        else if (el.type === "file") data[key] = el.files[0]?.name ?? "";
+        else if (key) data[key] = el.value;
+      }
+    }
+
+    function setupWizard() {
+      const forms = [...document.querySelectorAll("form.step")];
+      const items = [...document.querySelectorAll("#stepper li")];
+      let current = 0;
+      const show = (i) => {
+        current = i;
+        forms.forEach((f, k) => f.classList.toggle("current", k === i));
+        items.forEach((li, k) => { li.classList.toggle("active", k === i); li.classList.toggle("done", k < i); });
+        if (i === 4) {
+          document.getElementById("reviewList").innerHTML = Object.entries(FIELDS)
+            .filter(([k]) => data[k] !== undefined && data[k] !== "")
+            .map(([k, label]) => `<dt>${label}</dt><dd>${k === "aadhaar" ? "XXXX XXXX " + String(data[k]).slice(-4) : data[k] === true ? "Yes" : data[k] === false ? "No" : data[k]}</dd>`)
+            .join("");
+        }
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      };
+      forms.forEach((form, i) => {
+        form.addEventListener("submit", (e) => {
+          e.preventDefault();
+          // Validate like a real bank form: required fields and formats.
+          if (!form.checkValidity()) return form.reportValidity();
+          if (form.id === "kyc-identity" && !/^[A-Z]{5}\d{4}[A-Z]$/.test(form.pan.value.toUpperCase())) {
+            form.pan.setCustomValidity("Enter a valid PAN, e.g. ABCDE1234F"); form.pan.reportValidity(); form.pan.setCustomValidity(""); return;
+          }
+          collect(form);
+          if (i < forms.length - 1) show(i + 1);
+          else go("/kyc/done");
+        });
+        form.querySelector("[data-back]")?.addEventListener("click", () => show(Math.max(0, i - 1)));
+      });
+      show(0);
+    }
+
+    document.addEventListener("click", (e) => {
+      const a = e.target.closest("a[href^='/']");
+      if (!a || e.defaultPrevented) return;
+      e.preventDefault();
+      go(a.getAttribute("href"));
+    });
+    addEventListener("popstate", render);
+    render();
+  </script>
+
+  <!-- Raahi: the only lines a bank adds. -->
+  <script src="/raahi.global.js"></script>
+  <script src="/kyc-flows.js"></script>
+  <script>
+    const params = new URLSearchParams(location.search);
+    window.guide = Raahi.init({
+      flows: RAAHI_FLOWS,
+      knowledge: RAAHI_BANK_KNOWLEDGE,
+      language: "en",
+      languages: ["en", "hi", "gu"],
+      color: "#1356c4",
+      tts: !params.has("quiet"),
+      // Default: the bank's own backend answers (key stays on its server).
+      // ?cloud: use hosted Raahi Cloud with a public project key instead.
+      ai: params.has("cloud")
+        ? { endpoint: "http://localhost:4600/v1/explain", projectKey: "rh_pub_demo_bharat_bank" }
+        : { endpoint: "/api/explain" },
+      onEvent: (e) => console.debug("[raahi]", e),
+    });
+  </script>
+</body>
+</html>
