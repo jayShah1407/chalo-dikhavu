@@ -46,6 +46,15 @@ export function css(color: string): string {
 }
 .bubble .answer input:focus { outline: 2px solid ${color}; outline-offset: -1px; border-color: transparent; }
 .bubble .answer button { padding: 7px 12px; }
+.bubble .answer .mic { width: 38px; height: 36px; padding: 0; border-radius: 10px; }
+.bubble .answer-hint { margin: 6px 2px 0; font-size: 12px; color: #64748b; min-height: 1em; }
+.bubble .answer-hint:empty { display: none; }
+.bubble .answer-hint[data-state="listening"] { color: #dc2626; font-weight: 600; }
+.bubble .answer-hint[data-state="listening"]::before {
+  content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #ef4444;
+  margin-right: 6px; vertical-align: 1px; animation: raahi-orb 1s ease-in-out infinite;
+}
+.bubble .answer-hint[data-state="problem"] { color: #b45309; }
 .bubble .actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; flex-wrap: wrap; }
 
 button.b {

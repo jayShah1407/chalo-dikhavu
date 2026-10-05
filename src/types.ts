@@ -190,4 +190,10 @@ export interface RaahiOptions {
   ai?: AiOptions;
   /** Site-wide background for the AI (who you are, support contacts, policies). */
   knowledge?: LocalizedText;
+  /**
+   * Listening timings for spoken answers. `waitMs`: how long to wait for the
+   * user to start speaking (default 8000). `silenceMs`: how long a pause ends
+   * their answer (default 1800; raise it for users who speak slowly).
+   */
+  speech?: { waitMs?: number; silenceMs?: number };
 }

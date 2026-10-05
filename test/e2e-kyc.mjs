@@ -22,26 +22,47 @@ const page = await browser.newPage({ viewport: { width: 1280, height: 860 } });
 const errors = [];
 page.on("pageerror", (e) => errors.push(e.message));
 
-// No microphone in headless Chrome: a fake recognizer that "hears" whatever the
-// test puts in window.__say while it's listening, or silence after 1.5s.
+// No microphone in headless Chrome. This fake behaves like Chrome's real one:
+// continuous sessions that the browser itself ends after ~4 s of silence, speech
+// split into segments, and it hears whatever the test puts in window.__say while
+// open. window.__deny = true makes it fail like a blocked microphone.
 await page.addInitScript(() => {
+  window.__listens = 0;
   window.SpeechRecognition = window.webkitSpeechRecognition = class {
     start() {
+      window.__listens++;
+      this.segments = [];
+      if (window.__deny) {
+        setTimeout(() => (this.onerror?.({ error: "not-allowed" }), this.end()), 50);
+        return;
+      }
       const began = Date.now();
       const tick = () => {
+        if (this.closed) return;
         if (window.__say) {
-          const text = window.__say;
+          this.segments.push(window.__say);
           window.__say = null;
-          this.onresult?.({ resultIndex: 0, results: [Object.assign([{ transcript: text }], { isFinal: true })] });
-          return this.onend?.();
+          const results = this.segments.map((t) => Object.assign([{ transcript: t }], { isFinal: true }));
+          this.onresult?.({ resultIndex: 0, results });
+        } else if (!this.segments.length && Date.now() - began > 4000) {
+          this.onerror?.({ error: "no-speech" });
+          return this.end();
         }
-        if (Date.now() - began > 1500) return this.onend?.();
         setTimeout(tick, 50);
       };
       tick();
     }
-    stop() {}
-    abort() {}
+    stop() {
+      setTimeout(() => this.end(), 150);
+    }
+    abort() {
+      this.end();
+    }
+    end() {
+      if (this.closed) return;
+      this.closed = true;
+      this.onend?.();
+    }
   };
 });
 
@@ -81,8 +102,33 @@ await check("step 1: personal details from generated questions", async () => {
   await answer("What's your date of birth?", "14/07/1998");
   await answer("Which marital status?", "single");
   await answer("Which gender? You can say: Male, Female, Transgender.", "male");
-  await answer("What's your father's or spouse's name?", "Rakesh Shah");
-  await answer("What's your mobile number?", "9825012345");
+});
+
+const hint = () => page.locator(".bubble.on .answer-hint");
+
+await check("silence: a clear 'didn't hear anything' message, not a frozen flow; 🎤 listens again", async () => {
+  await expectBubble("What's your father's or spouse's name?");
+  await hint().filter({ hasText: "Listening" }).waitFor({ timeout: 3000 });
+  // Nobody speaks. Chrome ends its session after ~4 s; Raahi keeps listening up to 8 s, then says so.
+  await hint().filter({ hasText: "didn't hear anything" }).waitFor({ timeout: 12000 });
+  await page.locator(".bubble.on .answer .mic").click();
+  await hint().filter({ hasText: "Listening" }).waitFor({ timeout: 2000 });
+  await page.evaluate(() => (window.__say = "Rakesh Shah"));
+  await expectBubble("I heard: Rakesh Shah", 8000);
+  await page.evaluate(() => (window.__say = "yes"));
+});
+
+await check("the guide's own voice coming back through the mic is ignored", async () => {
+  await expectBubble("What's your mobile number?", 8000);
+  await hint().filter({ hasText: "Listening" }).waitFor({ timeout: 4000 });
+  await page.evaluate(() => (window.__say = "what's your mobile number")); // the speakers
+  await page.waitForTimeout(600);
+  await page.evaluate(() => (window.__say = "nine eight two five zero one two three four five"));
+  await expectBubble("I heard: 98250 12345", 8000);
+  await page.evaluate(() => (window.__say = "haan"));
+});
+
+await check("typed answer after voice ones", async () => {
   await answer("What's your email?", "jay@example.com");
 });
 
@@ -124,7 +170,15 @@ await check("step 3: address, skipping an optional field", async () => {
   await answer("What's your address line 1?", "12, Shanti Nagar, CG Road");
   await expectBubble("What's your address line 2?");
   await bubbleButton("Skip").click();
+  // A blocked microphone says so (instead of silently doing nothing), and typing still works.
+  await expectBubble("What's your city?");
+  await page.evaluate(() => (window.__deny = true));
+  await page.locator(".bubble.on .answer .mic").click();
+  await hint().filter({ hasText: "microphone is blocked" }).waitFor({ timeout: 4000 });
   await answer("What's your city?", "Ahmedabad");
+  // Voice is now off for the session: no 🎤 button offered on the next question.
+  await expectBubble("Which state?");
+  if (await page.locator(".bubble.on .answer .mic").count()) throw new Error("mic offered after it was blocked");
   await answer("Which state?", "Gujarat");
   await answer("What's your PIN code?", "380001");
   await answer("Should I tick “My correspondence address is the same as above”?", "yes");

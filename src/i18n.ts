@@ -82,6 +82,11 @@ type UiKey =
   | "noWhy"
   | "youCanSay"
   | "related"
+  | "listeningNow"
+  | "notHeard"
+  | "micBlocked"
+  | "micUnavailable"
+  | "sayYesNo"
   | "uploadYourself";
 
 const UI: Record<string, Record<UiKey, string>> = {
@@ -127,6 +132,11 @@ const UI: Record<string, Record<UiKey, string>> = {
     noWhy: "I don't have an explanation for this yet. You can ask support.",
     youCanSay: "You can say: {options}.",
     related: "Related guides",
+    listeningNow: "Listening… speak now",
+    notHeard: "I didn't hear anything. Tap 🎤 to speak, or type your answer.",
+    micBlocked: "The microphone is blocked. Allow it from the 🔒 icon in the address bar, or type your answer.",
+    micUnavailable: "Voice isn't working right now. Please type your answer.",
+    sayYesNo: "Please say yes or no, or tap a button.",
     uploadYourself: "Please upload “{label}” yourself, then press Next.",
   },
   hi: {
@@ -171,6 +181,11 @@ const UI: Record<string, Record<UiKey, string>> = {
     noWhy: "इसके लिए अभी कोई जानकारी नहीं है। आप सपोर्ट से पूछ सकते हैं।",
     youCanSay: "आप बोल सकते हैं: {options}।",
     related: "संबंधित गाइड",
+    listeningNow: "सुन रहा हूँ… अब बोलिए",
+    notHeard: "मुझे कुछ सुनाई नहीं दिया। बोलने के लिए 🎤 दबाएँ, या जवाब लिखें।",
+    micBlocked: "माइक्रोफ़ोन बंद है। एड्रेस बार में 🔒 आइकन से इसे चालू करें, या जवाब लिखें।",
+    micUnavailable: "अभी आवाज़ काम नहीं कर रही। कृपया जवाब लिखें।",
+    sayYesNo: "कृपया हाँ या नहीं बोलें, या बटन दबाएँ।",
     uploadYourself: "कृपया “{label}” खुद अपलोड करें, फिर “आगे” दबाएँ।",
   },
   gu: {
@@ -215,6 +230,11 @@ const UI: Record<string, Record<UiKey, string>> = {
     noWhy: "આ માટે હજી કોઈ માહિતી નથી. તમે સપોર્ટને પૂછી શકો.",
     youCanSay: "તમે બોલી શકો: {options}.",
     related: "સંબંધિત ગાઇડ",
+    listeningNow: "સાંભળું છું… હવે બોલો",
+    notHeard: "મને કંઈ સંભળાયું નહીં. બોલવા માટે 🎤 દબાવો, અથવા જવાબ લખો.",
+    micBlocked: "માઇક્રોફોન બંધ છે. એડ્રેસ બારમાં 🔒 આઇકનથી ચાલુ કરો, અથવા જવાબ લખો.",
+    micUnavailable: "અત્યારે અવાજ કામ કરતો નથી. કૃપા કરીને જવાબ લખો.",
+    sayYesNo: "કૃપા કરીને હા કે ના બોલો, અથવા બટન દબાવો.",
     uploadYourself: "કૃપા કરીને “{label}” જાતે અપલોડ કરો, પછી “આગળ” દબાવો.",
   },
 };

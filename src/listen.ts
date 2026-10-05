@@ -27,45 +27,172 @@ export function canListen(): boolean {
   return typeof window !== "undefined" && recognitionCtor() !== null;
 }
 
+export type ListenStatus =
+  /** Heard an answer. */
+  | "ok"
+  /** Nobody spoke before `waitMs` ran out. */
+  | "silent"
+  /** The user or browser blocked the microphone. */
+  | "denied"
+  /** No microphone, no recognition service, or a network failure. */
+  | "unavailable"
+  /** Cancelled by the caller (the user started typing, the flow stopped). */
+  | "aborted";
+
+export interface ListenResult {
+  text: string;
+  status: ListenStatus;
+}
+
+export interface ListenOptions {
+  lang: string;
+  signal: AbortSignal;
+  onInterim?: (text: string) => void;
+  /** How long to wait for the user to *start* speaking. Default 8000 ms. */
+  waitMs?: number;
+  /**
+   * How long a pause ends the answer, once they've started. Default 1800 ms:
+   * long enough for "98250 … 12345", short enough not to feel stuck.
+   */
+  silenceMs?: number;
+  /** Hard cap on one answer. Default 25000 ms. */
+  maxMs?: number;
+  /** What the guide just said. A transcript that is mostly this is our own voice coming back, and is dropped. */
+  ignore?: string;
+}
+
+const echoWords = (s: string) => s.toLowerCase().split(/[^\p{L}\p{M}\p{N}]+/u).filter(Boolean);
+
 /**
- * Listen for one answer after a question: stops by itself after a pause.
- * Resolves "" if nothing was heard, voice is unavailable, or `signal` aborts;
- * the caller then keeps waiting for a typed answer instead.
+ * Is `heard` just the guide's own question picked up by the mic? Only for 3+
+ * words: a one-word answer like "Male" is legitimately also in "You can say: Male, Female".
  */
-export function listenOnce(lang: string, signal: AbortSignal, onInterim?: (text: string) => void, maxMs = 12000): Promise<string> {
+export function isEcho(heard: string, spoken: string | undefined): boolean {
+  if (!spoken) return false;
+  const h = echoWords(heard);
+  if (h.length < 3) return false;
+  const said = new Set(echoWords(spoken));
+  return h.filter((w) => said.has(w)).length / h.length >= 0.8;
+}
+
+/**
+ * Listen for one spoken answer after a question.
+ *
+ * Chrome's single-shot mode stops at the first pause (often before the user has
+ * started, or halfway through a phone number) and delivers results late. So this
+ * keeps recognition running continuously and decides itself when the answer is
+ * over: `silenceMs` after the last thing heard. If the browser ends the session
+ * early (it does after a few seconds of silence, or on a network blip), it's restarted.
+ */
+export function listenOnce(opts: ListenOptions): Promise<ListenResult> {
   const Ctor = recognitionCtor();
-  if (!Ctor || signal.aborted) return Promise.resolve("");
+  const { signal } = opts;
+  if (!Ctor) return Promise.resolve({ text: "", status: "unavailable" });
+  if (signal.aborted) return Promise.resolve({ text: "", status: "aborted" });
+  const waitMs = opts.waitMs ?? 8000;
+  const silenceMs = opts.silenceMs ?? 1800;
+  const maxMs = opts.maxMs ?? 25000;
+
   return new Promise((resolve) => {
-    const rec = new Ctor();
-    rec.lang = speechLocale(lang);
-    rec.interimResults = true;
-    rec.continuous = false;
-    let heard = "";
+    const started = Date.now();
+    let rec: Recognition | null = null;
     let settled = false;
-    const finish = () => {
+    let stopping = false;
+    let restarts = 0;
+    let lastHeardAt = 0;
+    let heard = ""; // text from sessions that already ended
+    let current = ""; // text from the live session
+    let failure: ListenStatus | null = null;
+
+    const text = () => `${heard} ${current}`.replace(/\s+/g, " ").trim();
+    const finish = (status: ListenStatus) => {
       if (settled) return;
       settled = true;
-      clearTimeout(timer);
+      clearInterval(clock);
       signal.removeEventListener("abort", onAbort);
-      resolve(heard.trim());
+      if (rec) {
+        rec.onresult = rec.onerror = rec.onend = null;
+        try {
+          rec.abort();
+        } catch {
+          /* already stopped */
+        }
+      }
+      resolve({ text: status === "ok" ? text() : "", status });
     };
-    const onAbort = () => {
-      heard = "";
-      rec.abort();
-      finish();
+    const onAbort = () => finish("aborted");
+
+    const begin = () => {
+      const r = new Ctor();
+      rec = r;
+      r.lang = speechLocale(opts.lang);
+      r.interimResults = true;
+      r.continuous = true;
+      r.onresult = (e) => {
+        // Chrome splits speech into segments at pauses. Drop any segment that is
+        // just our own question coming back through the speakers.
+        let t = "";
+        for (let i = 0; i < e.results.length; i++) {
+          const segment = e.results[i][0].transcript;
+          if (!isEcho(segment, opts.ignore)) t += segment + " ";
+        }
+        current = t.trim();
+        if (current) {
+          lastHeardAt = Date.now();
+          opts.onInterim?.(text());
+        }
+      };
+      r.onerror = (e) => {
+        if (e.error === "not-allowed" || e.error === "service-not-allowed") failure = "denied";
+        else if (e.error === "audio-capture" || e.error === "network" || e.error === "language-not-supported") failure = "unavailable";
+        // "no-speech" and "aborted" are normal here: onend decides what happens next.
+      };
+      r.onend = () => {
+        if (settled) return;
+        heard = text();
+        current = "";
+        if (failure) return finish(failure);
+        if (stopping) return finish(heard ? "ok" : "silent");
+        // Ended by the browser, not us. Keep listening while there's time left.
+        if (heard && Date.now() - lastHeardAt >= silenceMs * 0.5) return finish("ok");
+        if (restarts++ < 5 && Date.now() - started < maxMs) {
+          try {
+            begin();
+            return;
+          } catch {
+            /* fall through */
+          }
+        }
+        finish(heard ? "ok" : "silent");
+      };
+      r.start();
     };
-    rec.onresult = (e) => {
-      heard = Array.from({ length: e.results.length }, (_, i) => e.results[i][0].transcript).join(" ");
-      onInterim?.(heard);
-    };
-    rec.onerror = finish;
-    rec.onend = finish;
-    const timer = setTimeout(() => rec.stop(), maxMs);
+
+    // One clock decides when the answer is over, independent of browser quirks.
+    const clock = setInterval(() => {
+      const now = Date.now();
+      const spoke = lastHeardAt > 0;
+      const done =
+        (spoke && now - lastHeardAt >= silenceMs) || // they finished
+        (!spoke && now - started >= waitMs) || // they never started
+        now - started >= maxMs;
+      if (done && !stopping) {
+        stopping = true;
+        try {
+          rec?.stop(); // flushes the last result, then onend → finish
+        } catch {
+          finish(spoke ? "ok" : "silent");
+        }
+        // Some browsers never fire onend after stop(); don't hang on them.
+        setTimeout(() => finish(lastHeardAt ? "ok" : "silent"), 1500);
+      }
+    }, 100);
+
     signal.addEventListener("abort", onAbort);
     try {
-      rec.start();
+      begin();
     } catch {
-      finish();
+      finish("unavailable");
     }
   });
 }

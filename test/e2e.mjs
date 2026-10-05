@@ -24,8 +24,9 @@ async function check(name, fn) {
 
 // A getter, not a constant: `page` is replaced for the do-mode tests below.
 const bubble = { textContent: () => page.locator(".bubble.on .text").textContent() };
+// Spoken answers end after ~1.8 s of silence, plus a short read-back, so allow time.
 async function expectBubble(text) {
-  await page.locator(".bubble.on .text").filter({ hasText: text }).waitFor({ timeout: 5000 });
+  await page.locator(".bubble.on .text").filter({ hasText: text }).waitFor({ timeout: 12000 });
 }
 /** The cursor should have glided onto the highlighted element. */
 async function expectCursorOn(selector) {
@@ -122,26 +123,37 @@ await check("missing element shows a friendly message, not a crash", async () =>
 
 // ---- "do it with me": the whole bank form from one `form:` step ----------------
 
-// Headless Chrome has no microphone, so stand in a fake recognizer that "hears"
-// a scripted queue of answers. `null` means silence (the user types instead).
+// Headless Chrome has no microphone, so stand in a fake recognizer. Like Chrome's
+// continuous mode it stays open until stop()/abort(), and it "hears" whatever the
+// test puts in window.__say while it's open. The test speaks when it sees the question.
 page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
 page.on("pageerror", (e) => errors.push(e.message));
 await page.addInitScript(() => {
-  window.__speech = [];
   // Newer Chrome has the unprefixed API too, and Raahi prefers it: replace both.
   window.SpeechRecognition = window.webkitSpeechRecognition = class {
     start() {
-      setTimeout(() => {
-        const text = window.__speech.shift();
-        if (text) {
-          const result = Object.assign([{ transcript: text }], { isFinal: true });
+      const tick = () => {
+        if (this.closed) return;
+        if (window.__say) {
+          const result = Object.assign([{ transcript: window.__say }], { isFinal: true });
+          window.__say = null;
           this.onresult?.({ resultIndex: 0, results: [result] });
         }
-        this.onend?.();
-      }, 700); // long enough for the test to see each bubble
+        setTimeout(tick, 50);
+      };
+      tick();
     }
-    stop() {}
-    abort() {}
+    stop() {
+      setTimeout(() => this.end(), 100);
+    }
+    abort() {
+      this.end();
+    }
+    end() {
+      if (this.closed) return;
+      this.closed = true;
+      this.onend?.();
+    }
   };
 });
 await page.goto(`${BASE}/bank?quiet`);
@@ -152,20 +164,15 @@ async function typeAnswer(text) {
   await answerBox.press("Enter");
 }
 
+/** Wait for a question, then "say" the answer once the mic is open. */
+async function sayTo(question, text) {
+  await expectBubble(question);
+  await page.locator(".bubble.on .answer-hint", { hasText: "Listening" }).waitFor({ timeout: 6000 });
+  await page.evaluate((t) => (window.__say = t), text);
+}
+
 await check("do mode: asks 'do it with me' or 'just show me' for form flows", async () => {
-  await page.evaluate(() => {
-    window.__speech.push(
-      "jay shah", "yes",                                  // name, by voice, confirmed
-      "nine eight two five zero one two three four five", "haan", // mobile, Hinglish yes
-      null,                                               // email: typed
-      "14 July 1998", "yes",                              // date of birth
-      null,                                               // PAN: typed
-      "savings", "yes",                                   // select
-      "the second one", "ji",                             // radio group
-      "haan",                                             // checkbox (no read-back needed)
-    );
-    window.guide.ask("I want to open a bank account");
-  });
+  await page.evaluate(() => window.guide.ask("I want to open a bank account"));
   await expectBubble("fill this in with you");
   await page.locator(".bubble.on button.primary").click(); // Do it with me
 });
@@ -175,10 +182,10 @@ await check("do mode: clicks buttons for the user (with the cursor)", async () =
 });
 
 await check("generated question + spoken answer + read-back confirmation", async () => {
-  await expectBubble("What's your full name?");
-  await expectBubble("I heard: Jay Shah");
-  await expectBubble("mobile number");
-  await expectBubble("I heard: 98250 12345");
+  await sayTo("What's your full name?", "jay shah");
+  await sayTo("I heard: Jay Shah", "yes");
+  await sayTo("mobile number", "nine eight two five zero one two three four five");
+  await sayTo("I heard: 98250 12345", "haan"); // Hinglish yes
 });
 
 await check("typed answers go straight in", async () => {
@@ -187,11 +194,14 @@ await check("typed answers go straight in", async () => {
 });
 
 await check("dates, PAN, select and radio questions", async () => {
-  await expectBubble("date of birth");
+  await sayTo("date of birth", "14 July 1998");
+  await sayTo("I heard: 14 July 1998", "yes");
   await expectBubble("What's your PAN?");
   await typeAnswer("abcde1234f");
-  await expectBubble("Which account type? You can say: Savings, Current, Salary.");
-  await expectBubble("Which gender?");
+  await sayTo("Which account type? You can say: Savings, Current, Salary.", "savings");
+  await sayTo("I heard: Savings", "yes");
+  await sayTo("Which gender?", "the second one");
+  await sayTo("I heard: Female", "ji");
 });
 
 await check("password is never asked for: user types it", async () => {
@@ -202,7 +212,7 @@ await check("password is never asked for: user types it", async () => {
 });
 
 await check("checkbox question, then the user presses submit themselves", async () => {
-  await expectBubble("Should I tick");
+  await sayTo("Should I tick", "haan"); // checkboxes need no read-back
   await expectBubble("then press “Open account” yourself");
   await page.waitForTimeout(800);
   if (await page.locator("#result").textContent()) throw new Error("form was submitted without the user");

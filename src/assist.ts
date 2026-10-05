@@ -24,8 +24,12 @@ export interface AssistHost {
   lang: string;
   flowId: string;
   signal: AbortSignal;
-  /** Voice input is available in this browser. */
+  /** Voice input is available (browser supports it, and the mic hasn't been blocked). */
   voice: boolean;
+  /** The mic was blocked: stop trying voice for the rest of this session. */
+  disableVoice(): void;
+  /** Listening timings from RaahiOptions.speech. */
+  speech?: { waitMs?: number; silenceMs?: number };
   emit(event: RaahiEvent): void;
   stopButton(): BubbleButton;
   /**
@@ -94,9 +98,96 @@ function inputTypeFor(info: FieldInfo): string {
   return "text";
 }
 
+/** Pause after the guide stops talking before opening the mic, so room echo dies down. */
+const ECHO_GAP_MS = 350;
+
+/**
+ * One spoken exchange: say `prompt`, wait until the speech has *really* ended
+ * (plus an echo gap), then listen, showing the mic state in the bubble the
+ * whole time. Silence or a blocked mic never leaves the user stuck: they see
+ * what happened and can tap 🎤 to try again, or type.
+ */
+function voiceTurn(
+  host: AssistHost,
+  prompt: string,
+  audio: LocalizedText | undefined,
+  accept: (heard: string) => boolean,
+  unusable: string,
+  /** Short replies like "yes" don't need the long end-of-answer pause. */
+  shortReply = false,
+) {
+  const { overlay, lang } = host;
+  let listening: AbortController | null = null;
+  let closed = false;
+  let typing = false;
+
+  const cancel = () => {
+    listening?.abort();
+    listening = null;
+    overlay.showListening(false);
+  };
+
+  const listen = async (): Promise<void> => {
+    cancel();
+    if (closed) return;
+    if (!host.voice) return overlay.setMicState("problem", ui(lang, "micUnavailable"));
+    host.speaker.stop(); // tapped 🎤 mid-sentence: stop talking first, never listen over ourselves
+    typing = false;
+    const mine = new AbortController();
+    listening = mine;
+    overlay.setMicState("listening", ui(lang, "listeningNow"));
+    overlay.showListening(true);
+    const r = await listenOnce({
+      lang,
+      signal: mine.signal,
+      ignore: prompt,
+      onInterim: (t) => overlay.showListening(true, t),
+      ...host.speech,
+      ...(shortReply ? { silenceMs: Math.min(1000, host.speech?.silenceMs ?? 1000) } : {}),
+    });
+    if (mine.signal.aborted || closed) return;
+    listening = null;
+    overlay.showListening(false);
+    if (r.status === "ok") {
+      if (!accept(r.text)) overlay.setMicState("idle", unusable);
+      return;
+    }
+    if (r.status === "denied") {
+      host.disableVoice();
+      return overlay.setMicState("problem", ui(lang, "micBlocked"));
+    }
+    if (r.status === "unavailable") return overlay.setMicState("problem", ui(lang, "micUnavailable"));
+    overlay.setMicState("idle", ui(lang, "notHeard"));
+  };
+
+  return {
+    /** Speak, then listen automatically (unless the user already typed or tapped 🎤). */
+    async start(): Promise<void> {
+      await host.speaker.play(prompt, audio, lang);
+      if (closed || typing || listening || host.signal.aborted) return;
+      await sleep(ECHO_GAP_MS, host.signal);
+      if (closed || typing || listening || host.signal.aborted) return;
+      if (host.voice) await listen();
+    },
+    listen,
+    /** Push-to-talk took over the mic. */
+    cancel,
+    /** The user is typing: stop listening, and don't auto-start later. */
+    typing(): void {
+      typing = true;
+      cancel();
+      overlay.setMicState("idle", "");
+    },
+    close(): void {
+      closed = true;
+      cancel();
+    },
+  };
+}
+
 /**
  * Ask one question and wait for an answer: spoken (auto-listen after the
- * question, or push-to-talk) or typed into the bubble. Whichever comes first.
+ * question, the 🎤 button, or push-to-talk) or typed into the bubble.
  */
 function askOnce(
   host: AssistHost,
@@ -109,7 +200,7 @@ function askOnce(
 ): Promise<AskResult> {
   const { overlay, lang, signal } = host;
   return pending<AskResult>(signal, "stop", (done) => {
-    const auto = new AbortController();
+    const turn = voiceTurn(host, prompt, audio, (text) => (done({ text, typed: false }), true), ui(lang, "notHeard"));
     const buttons: BubbleButton[] = [host.stopButton()];
     if (canAskWhy) buttons.push({ label: ui(lang, "why"), onClick: () => done("why") });
     if (canSkip) buttons.push({ label: ui(lang, "skip"), onClick: () => done("skip") });
@@ -117,60 +208,50 @@ function askOnce(
       placeholder: ui(lang, "answerPlaceholder"),
       type: inputTypeFor(info),
       onSubmit: (text) => done({ text, typed: true }),
-      onTyping: () => auto.abort(),
+      onTyping: () => turn.typing(),
+      onMic: host.voice ? () => void turn.listen() : undefined,
     };
     overlay.showStep(info.point, meta, prompt, buttons, box);
     void overlay.moveCursor();
-    host.setAnswerSink((text) => done({ text, typed: false }), () => auto.abort());
-
-    void (async () => {
-      await host.speaker.play(prompt, audio, lang);
-      if (auto.signal.aborted || signal.aborted || !host.voice) return;
-      overlay.showListening(true);
-      const heard = await listenOnce(lang, auto.signal, (t) => overlay.showListening(true, t));
-      if (!auto.signal.aborted) overlay.showListening(false);
-      // Nothing heard: keep waiting for typing or push-to-talk rather than nagging.
-      if (heard) done({ text: heard, typed: false });
-    })();
-
+    host.setAnswerSink((text) => done({ text, typed: false }), () => turn.cancel());
+    void turn.start();
     return () => {
-      auto.abort();
+      turn.close();
       host.setAnswerSink(null);
-      overlay.showListening(false);
     };
   });
 }
 
-/** "I heard: 98250 12345. Is that right?" — yes/no by voice or button. */
+/** "I heard: 98250 12345. Is that right?" — yes/no by voice, typing or button. */
 function confirmValue(host: AssistHost, info: FieldInfo, meta: string, display: string): Promise<boolean | "stop"> {
   const { overlay, lang, signal } = host;
   return pending<boolean | "stop">(signal, "stop", (done) => {
-    const auto = new AbortController();
     const text = ui(lang, "heard", { value: display });
+    const answer = (t: string) => {
+      const yes = parseYesNo(t);
+      if (yes !== null) done(yes);
+      return yes !== null;
+    };
+    const turn = voiceTurn(host, text, undefined, answer, ui(lang, "sayYesNo"), true);
     overlay.showStep(info.point, meta, text, [
       host.stopButton(),
       { label: ui(lang, "no"), onClick: () => done(false) },
       { label: ui(lang, "yes"), primary: true, onClick: () => done(true) },
-    ]);
+    ], {
+      placeholder: ui(lang, "sayYesNo"),
+      onSubmit: (t) => {
+        if (!answer(t)) overlay.setMicState("idle", ui(lang, "sayYesNo"));
+      },
+      onTyping: () => turn.typing(),
+      onMic: host.voice ? () => void turn.listen() : undefined,
+    });
     host.setAnswerSink((t) => {
-      const yes = parseYesNo(t);
-      if (yes !== null) done(yes);
-    }, () => auto.abort());
-
-    void (async () => {
-      await host.speaker.play(text, undefined, lang);
-      if (auto.signal.aborted || signal.aborted || !host.voice) return;
-      overlay.showListening(true);
-      const heard = await listenOnce(lang, auto.signal, (t) => overlay.showListening(true, t), 6000);
-      if (!auto.signal.aborted) overlay.showListening(false);
-      const yes = parseYesNo(heard);
-      if (yes !== null) done(yes);
-    })();
-
+      if (!answer(t)) overlay.setMicState("idle", ui(lang, "sayYesNo"));
+    }, () => turn.cancel());
+    void turn.start();
     return () => {
-      auto.abort();
+      turn.close();
       host.setAnswerSink(null);
-      overlay.showListening(false);
     };
   });
 }

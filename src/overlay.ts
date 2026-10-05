@@ -33,7 +33,11 @@ export interface AnswerBox {
   onSubmit: (text: string) => void;
   /** The user started typing: stop listening so the two don't race. */
   onTyping?: () => void;
+  /** Shows a 🎤 button that listens again (after silence, or to retry). */
+  onMic?: () => void;
 }
+
+export type MicState = "listening" | "idle" | "problem";
 
 export interface OverlayHandlers {
   onAsk: (query: string) => void;
@@ -76,6 +80,8 @@ export class Overlay {
   private panelTitle: HTMLElement;
   private hint: HTMLElement;
 
+  private answerHint: HTMLElement | null = null;
+  private answerMic: HTMLButtonElement | null = null;
   private target: Element | null = null;
   private pos: Point = { x: innerWidth - 60, y: innerHeight - 60 };
   private anim: { from: Point; start: number; dur: number; done: () => void } | null = null;
@@ -230,21 +236,44 @@ export class Overlay {
       ...buttons.map((b) => h("button", { class: "b" + (b.primary ? " primary" : ""), type: "button", onclick: b.onClick }, b.label)),
     );
     const children: Node[] = [h("div", { class: "meta" }, h("span", {}, meta)), h("div", { class: "text" }, text)];
+    this.answerHint = null;
+    this.answerMic = null;
     if (answer) {
       const input = h("input", { type: answer.type ?? "text", placeholder: answer.placeholder, autocomplete: "off" });
       input.addEventListener("keydown", (e) => e.stopPropagation()); // Space here is typing, not push-to-talk
       input.addEventListener("input", () => answer.onTyping?.());
+      const parts: Node[] = [input];
+      if (answer.onMic) {
+        const onMic = answer.onMic;
+        this.answerMic = h("button", { class: "mic", type: "button", "aria-label": "Answer by voice", onclick: () => onMic() }, "🎤");
+        parts.push(this.answerMic);
+      }
+      parts.push(h("button", { class: "b primary", type: "submit", "aria-label": "Send" }, "↵"));
       children.push(h("form", {
         class: "answer",
         onsubmit: (e) => {
           e.preventDefault();
           if (input.value.trim()) answer.onSubmit(input.value);
         },
-      }, input, h("button", { class: "b primary", type: "submit", "aria-label": "Send" }, "↵")));
+      }, ...parts));
+      this.answerHint = h("p", { class: "answer-hint", "aria-live": "polite" });
+      children.push(this.answerHint);
     }
     children.push(actions);
     this.bubble.replaceChildren(...children);
     this.bubble.classList.add("on");
+  }
+
+  /**
+   * Show what the mic is doing under the answer box, so silence never looks
+   * like a frozen flow: "Listening…", "I didn't hear anything — tap 🎤", etc.
+   */
+  setMicState(state: MicState, text: string): void {
+    if (this.answerHint) {
+      this.answerHint.textContent = text;
+      this.answerHint.dataset.state = state;
+    }
+    this.answerMic?.classList.toggle("live", state === "listening");
   }
 
   /** Keep pointing at the same step after the site re-rendered its element. */

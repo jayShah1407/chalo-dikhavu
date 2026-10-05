@@ -62,7 +62,7 @@ function canDo(flow: Flow): boolean {
 }
 
 export class Raahi {
-  private readonly opts: Required<Omit<RaahiOptions, "onEvent" | "navigate" | "ai" | "knowledge">> & Pick<RaahiOptions, "onEvent" | "navigate" | "ai" | "knowledge">;
+  private readonly opts: Required<Omit<RaahiOptions, "onEvent" | "navigate" | "ai" | "knowledge" | "speech">> & Pick<RaahiOptions, "onEvent" | "navigate" | "ai" | "knowledge" | "speech">;
   private overlay: Overlay | null = null;
   private readonly speaker: Speaker;
   private readonly listener: Listener;
@@ -71,6 +71,8 @@ export class Raahi {
   private holdTimer: ReturnType<typeof setTimeout> | null = null;
   private listening = false;
   private answerSink: ((text: string) => void) | null = null;
+  /** The mic was blocked this session; stop offering voice until reload. */
+  private voiceOff = false;
   private cancelAutoListen: (() => void) | null = null;
   private readonly cleanup: Array<() => void> = [];
 
@@ -369,13 +371,18 @@ export class Raahi {
   }
 
   private assistHost(flow: Flow, signal: AbortSignal): AssistHost {
+    const self = this;
     return {
       overlay: this.overlay!,
       speaker: this.speaker,
       lang: this.lang,
       flowId: flow.id,
       signal,
-      voice: canListen(),
+      get voice() {
+        return canListen() && !self.voiceOff;
+      },
+      disableVoice: () => (this.voiceOff = true),
+      speech: this.opts.speech,
       emit: (e) => this.emit(e),
       stopButton: () => this.stopButton(),
       setAnswerSink: (sink, cancelAuto) => {
@@ -566,15 +573,21 @@ export class Raahi {
     if (this.listening) return;
     // A question is open and already auto-listening: take over the mic.
     this.cancelAutoListen?.();
-    if (!canListen() || !this.listener.start(this.lang)) {
-      if (this.answerSink) return; // they can still type the answer in the bubble
+    // Silence the guide *before* opening the mic, or it hears itself.
+    this.speaker.stop();
+    if (!canListen() || this.voiceOff || !this.listener.start(this.lang)) {
+      if (this.answerSink) {
+        // They can still type the answer in the bubble.
+        this.overlay?.setMicState("problem", ui(this.lang, this.voiceOff ? "micBlocked" : "micUnavailable"));
+        return;
+      }
       this.overlay?.togglePanel(true);
       this.overlay?.setMessage(ui(this.lang, "micUnsupported"));
       return;
     }
     this.listening = true;
-    this.speaker.stop();
     this.overlay?.showListening(true);
+    if (this.answerSink) this.overlay?.setMicState("listening", ui(this.lang, "listeningNow"));
   }
 
   private async finishListening(): Promise<void> {
@@ -582,7 +595,10 @@ export class Raahi {
     this.listening = false;
     const text = await this.listener.finish();
     this.overlay?.showListening(false);
-    if (!text.trim()) return;
+    if (!text.trim()) {
+      if (this.answerSink) this.overlay?.setMicState("idle", ui(this.lang, "notHeard"));
+      return;
+    }
     // While a form question is open, speech answers it rather than starting a new search.
     if (this.answerSink) this.answerSink(text);
     else this.ask(text);
