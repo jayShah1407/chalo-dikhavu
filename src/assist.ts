@@ -46,7 +46,8 @@ export interface AssistHost {
   explain(question: string, field: FieldInfo, why: LocalizedText | undefined, preferWhy: boolean): Promise<string>;
 }
 
-type Answer = { text: string; typed: boolean };
+/** `alternatives`: the recognizer's other guesses, best first (voice only). */
+type Answer = { text: string; typed: boolean; alternatives?: string[] };
 type AskResult = Answer | "skip" | "stop" | "why";
 
 /** Resolve via `done` from inside `setup`; runs teardown on resolve or when the flow is stopped. */
@@ -98,6 +99,18 @@ function inputTypeFor(info: FieldInfo): string {
   return "text";
 }
 
+/**
+ * Parse an answer, trying the recognizer's other guesses if the best one doesn't
+ * fit the field: "G" is no name, but the second guess "Jay" is.
+ */
+function parseBest(info: FieldInfo, answer: Answer): Parsed {
+  for (const candidate of [answer.text, ...(answer.alternatives ?? [])]) {
+    const parsed = parseAnswer(info, candidate, answer.typed);
+    if (parsed.ok) return parsed;
+  }
+  return { ok: false };
+}
+
 /** Pause after the guide stops talking before opening the mic, so room echo dies down. */
 const ECHO_GAP_MS = 350;
 
@@ -111,7 +124,7 @@ function voiceTurn(
   host: AssistHost,
   prompt: string,
   audio: LocalizedText | undefined,
-  accept: (heard: string) => boolean,
+  accept: (heard: string, alternatives: string[]) => boolean,
   unusable: string,
   /** Short replies like "yes" don't need the long end-of-answer pause. */
   shortReply = false,
@@ -135,13 +148,14 @@ function voiceTurn(
     typing = false;
     const mine = new AbortController();
     listening = mine;
+    // The bubble shows the mic state and the words as they're heard; the floating
+    // "Listening…" pill is for push-to-talk outside a question, and here it would cover the buttons.
     overlay.setMicState("listening", ui(lang, "listeningNow"));
-    overlay.showListening(true);
     const r = await listenOnce({
       lang,
       signal: mine.signal,
       ignore: prompt,
-      onInterim: (t) => overlay.showListening(true, t),
+      onInterim: (t) => overlay.setMicState("listening", `${ui(lang, "listeningNow")}: “${t}”`),
       ...host.speech,
       ...(shortReply ? { silenceMs: Math.min(1000, host.speech?.silenceMs ?? 1000) } : {}),
     });
@@ -149,7 +163,7 @@ function voiceTurn(
     listening = null;
     overlay.showListening(false);
     if (r.status === "ok") {
-      if (!accept(r.text)) overlay.setMicState("idle", unusable);
+      if (!accept(r.text, r.alternatives)) overlay.setMicState("idle", unusable);
       return;
     }
     if (r.status === "denied") {
@@ -200,7 +214,7 @@ function askOnce(
 ): Promise<AskResult> {
   const { overlay, lang, signal } = host;
   return pending<AskResult>(signal, "stop", (done) => {
-    const turn = voiceTurn(host, prompt, audio, (text) => (done({ text, typed: false }), true), ui(lang, "notHeard"));
+    const turn = voiceTurn(host, prompt, audio, (text, alternatives) => (done({ text, typed: false, alternatives }), true), ui(lang, "notHeard"));
     const buttons: BubbleButton[] = [host.stopButton()];
     if (canAskWhy) buttons.push({ label: ui(lang, "why"), onClick: () => done("why") });
     if (canSkip) buttons.push({ label: ui(lang, "skip"), onClick: () => done("skip") });
@@ -223,30 +237,46 @@ function askOnce(
 }
 
 /** "I heard: 98250 12345. Is that right?" — yes/no by voice, typing or button. */
-function confirmValue(host: AssistHost, info: FieldInfo, meta: string, display: string): Promise<boolean | "stop"> {
+/**
+ * "I heard: Jay Shah. Is that right?" The heard value sits in an editable box:
+ * the user can say yes/no, fix it by typing (names are where speech-to-text
+ * fails most), or simply say the corrected value. Resolves true/false, or the
+ * correction as a new Answer.
+ */
+type Confirmed = boolean | "stop" | Answer;
+function confirmValue(host: AssistHost, info: FieldInfo, meta: string, display: string): Promise<Confirmed> {
   const { overlay, lang, signal } = host;
-  return pending<boolean | "stop">(signal, "stop", (done) => {
-    const text = ui(lang, "heard", { value: display });
-    const answer = (t: string) => {
+  return pending<Confirmed>(signal, "stop", (done) => {
+    const spoken = ui(lang, "heard", { value: display });
+    const byVoice = (t: string, alternatives: string[] = []) => {
       const yes = parseYesNo(t);
-      if (yes !== null) done(yes);
-      return yes !== null;
+      if (yes !== null) return done(yes), true;
+      // Not yes/no: maybe they just said the right value. Treat it as a correction.
+      if (!isQuestion(t) && [t, ...alternatives].some((c) => parseAnswer(info, c).ok)) {
+        return done({ text: t, typed: false, alternatives }), true;
+      }
+      return false;
     };
-    const turn = voiceTurn(host, text, undefined, answer, ui(lang, "sayYesNo"), true);
-    overlay.showStep(info.point, meta, text, [
+    const turn = voiceTurn(host, spoken, undefined, byVoice, ui(lang, "sayYesNo"), info.kind !== "name" && info.kind !== "text");
+    overlay.showStep(info.point, meta, `${spoken}\n${ui(lang, "fixBelow")}`, [
       host.stopButton(),
       { label: ui(lang, "no"), onClick: () => done(false) },
       { label: ui(lang, "yes"), primary: true, onClick: () => done(true) },
     ], {
       placeholder: ui(lang, "sayYesNo"),
+      value: display,
+      type: inputTypeFor(info),
       onSubmit: (t) => {
-        if (!answer(t)) overlay.setMicState("idle", ui(lang, "sayYesNo"));
+        // Enter on the untouched value = "yes"; an edited value is the correction.
+        if (t.trim() === display) return done(true);
+        const yes = parseYesNo(t);
+        done(yes !== null && t.trim().split(/\s+/).length <= 2 ? yes : { text: t, typed: true });
       },
       onTyping: () => turn.typing(),
       onMic: host.voice ? () => void turn.listen() : undefined,
     });
     host.setAnswerSink((t) => {
-      if (!answer(t)) overlay.setMicState("idle", ui(lang, "sayYesNo"));
+      if (!byVoice(t)) overlay.setMicState("idle", ui(lang, "sayYesNo"));
     }, () => turn.cancel());
     void turn.start();
     return () => {
@@ -341,22 +371,32 @@ export async function assistField(host: AssistHost, info: FieldInfo, opts: Field
     if (tapped) continue; // unreachable; narrows `answer` for TypeScript
 
     attempt++;
-    const parsed = parseAnswer(info, answer.text, answer.typed);
+    let parsed = parseBest(info, answer);
     if (!parsed.ok) {
       prompt = `${ui(lang, "retry")}\n\n${question}`;
       continue;
     }
     // Speech gets misheard; typed answers are what the user meant.
-    if (!answer.typed && info.kind !== "check") {
-      const ok = await confirmValue(host, info, meta, parsed.display);
-      if (ok === "stop") return "stop";
-      if (!ok) {
-        prompt = question;
-        continue;
+    let typed = answer.typed;
+    let rejected = false;
+    while (!typed && info.kind !== "check" && parsed.ok) {
+      const verdict = await confirmValue(host, info, meta, parsed.display);
+      if (verdict === "stop") return "stop";
+      if (verdict === true) break;
+      if (verdict === false) {
+        rejected = true;
+        break;
       }
+      // A correction: typed ones go straight in, spoken ones are read back again.
+      parsed = parseBest(info, verdict);
+      typed = verdict.typed;
+    }
+    if (rejected || !parsed.ok) {
+      prompt = rejected ? question : `${ui(lang, "retry")}\n\n${question}`;
+      continue;
     }
     await put(host, info, meta, parsed);
-    host.emit({ type: "field:filled", flowId: host.flowId, label: info.label, by: answer.typed ? "typed" : "voice" });
+    host.emit({ type: "field:filled", flowId: host.flowId, label: info.label, by: typed ? "typed" : "voice" });
     return signal.aborted ? "stop" : "next";
   }
   return userFills(host, info, meta, ui(lang, "fillYourself", { label: info.label }), opts.why);

@@ -91,7 +91,10 @@ export class Raahi {
     const saved = storage("local")?.getItem(LANG_KEY);
     this.lang = saved && this.opts.languages.includes(saved) ? saved : language;
     this.speaker = new Speaker(this.opts.tts);
-    this.listener = new Listener((text) => this.overlay?.showListening(true, text));
+    this.listener = new Listener((text) => {
+      if (this.answerSink) this.overlay?.setMicState("listening", `${ui(this.lang, "listeningNow")}: “${text}”`);
+      else this.overlay?.showListening(true, text);
+    });
   }
 
   /** Attach the UI and listeners. Resumes a flow that was interrupted by a page load. */
@@ -586,8 +589,9 @@ export class Raahi {
       return;
     }
     this.listening = true;
-    this.overlay?.showListening(true);
+    // During a question the bubble shows the mic state; the pill would cover its buttons.
     if (this.answerSink) this.overlay?.setMicState("listening", ui(this.lang, "listeningNow"));
+    else this.overlay?.showListening(true);
   }
 
   private async finishListening(): Promise<void> {

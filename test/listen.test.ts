@@ -82,7 +82,7 @@ describe("listenOnce on a Chrome-like recognizer", () => {
     expect(ChromeLikeRecognizer.sessions).toBe(2);
     rec().hear("Jay Shah");
     await at(2500);
-    expect(l.result).toEqual({ text: "Jay Shah", status: "ok" });
+    expect(l.result).toMatchObject({ text: "Jay Shah", status: "ok" });
   });
 
   it("doesn't cut off a phone number spoken with a pause in the middle", async () => {
@@ -95,7 +95,7 @@ describe("listenOnce on a Chrome-like recognizer", () => {
     expect(l.result).toBeNull();
     rec().hear("12345", true);
     await at(2500);
-    expect(l.result).toEqual({ text: "98250 12345", status: "ok" });
+    expect(l.result).toMatchObject({ text: "98250 12345", status: "ok" });
   });
 
   it("keeps a late result that arrives just after it decided to stop", async () => {
@@ -105,7 +105,7 @@ describe("listenOnce on a Chrome-like recognizer", () => {
     await at(1850); // silence threshold reached: stop() requested
     rec().hear("savings account", true); // Chrome flushes the final text during stop()
     await at(500);
-    expect(l.result).toEqual({ text: "savings account", status: "ok" });
+    expect(l.result).toMatchObject({ text: "savings account", status: "ok" });
   });
 
   it("ignores the guide's own question picked up by the mic", async () => {
@@ -116,13 +116,13 @@ describe("listenOnce on a Chrome-like recognizer", () => {
     expect(l.result).toBeNull(); // still waiting for the real answer
     rec().hear("9825012345");
     await at(2500);
-    expect(l.result).toEqual({ text: "9825012345", status: "ok" });
+    expect(l.result).toMatchObject({ text: "9825012345", status: "ok" });
   });
 
   it("reports silence instead of hanging", async () => {
     const l = listen({ waitMs: 8000 });
     await at(8000 + 2000);
-    expect(l.result).toEqual({ text: "", status: "silent" });
+    expect(l.result).toMatchObject({ text: "", status: "silent" });
   });
 
   it("reports a blocked microphone", async () => {
@@ -130,7 +130,7 @@ describe("listenOnce on a Chrome-like recognizer", () => {
     await at(50);
     rec().fail("not-allowed");
     await at(50);
-    expect(l.result).toEqual({ text: "", status: "denied" });
+    expect(l.result).toMatchObject({ text: "", status: "denied" });
   });
 
   it("stops at once when the user starts typing", async () => {
@@ -139,7 +139,7 @@ describe("listenOnce on a Chrome-like recognizer", () => {
     rec().hear("Ja", false);
     l.ctl.abort();
     await at(10);
-    expect(l.result).toEqual({ text: "", status: "aborted" });
+    expect(l.result).toMatchObject({ text: "", status: "aborted" });
   });
 });
 
@@ -180,5 +180,17 @@ describe("Speaker", () => {
     expect(finished).toBe(false); // the old code resolved here and opened the mic over its own voice
     await at(2000);
     expect(finished).toBe(true);
+  });
+});
+
+describe("recognizer alternatives", () => {
+  it("returns the recognizer's other guesses so a name heard as 'G' can still be 'Jay'", async () => {
+    const l = listen();
+    await at(100);
+    const r = rec() as unknown as { onresult: (e: unknown) => void };
+    const guess = (...alts: string[]) => Object.assign(alts.map((transcript) => ({ transcript })), { isFinal: true });
+    r.onresult({ resultIndex: 0, results: [guess("G", "Jay", "J"), guess("Shah", "Sha")] });
+    await at(2500);
+    expect(l.result).toMatchObject({ text: "G Shah", status: "ok", alternatives: ["Jay Sha", "J Shah"] });
   });
 });

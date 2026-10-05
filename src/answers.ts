@@ -1,5 +1,6 @@
 import type { FieldInfo, FieldOption } from "./fields";
 import { scoreText } from "./intent";
+import { hasIndicScript, romaniseName } from "./translit";
 
 /**
  * Turn what someone said (or typed) into a value a field accepts.
@@ -173,9 +174,36 @@ function titleCase(s: string): string {
   return s.replace(/\S+/g, (w) => (/^[a-z]/.test(w) ? w[0].toUpperCase() + w.slice(1) : w));
 }
 
+// "my name is …", "my mobile number is …", "it's …", "I am …"
+const LEAD_EN = /^(?:(?:my|the)\s+(?:[\p{L}'’]+\s+){1,3}?(?:is|was|are)|it'?s|it is|this is|i am|i'm|its)\s+/iu;
+// "mera naam …", "mere papa ka naam …", "मेरा नाम …", "મારું નામ …"
+const LEAD_HI =
+  /^(?:mera|meri|mere|मेरा|मेरी|मेरे|મારું|મારો|મારી|મારા)\s+(?:(?:naam|name|number|nambar|no|mobile|phone|email|id|pata|address|pin|pincode|code|janam|janm|tithi|date|birth|pan|card|papa|pitaji|pita|father|husband|pati|wife|patni|ka|ki|ke|नाम|नंबर|मोबाइल|फ़ोन|फोन|ईमेल|पता|पिन|कोड|जन्म|तिथि|तारीख|पैन|कार्ड|पिता|पिताजी|पापा|पति|पत्नी|का|की|के|નામ|નંબર|મોબાઇલ|સરનામું|પિતા|પતિ|નો|ની|નું)\s+){1,4}/iu;
+// "… hai", "… है", "… છે"
+const TRAIL = /\s+(?:hai|he|hain|है|हैं|chhe|che|છે)$/iu;
+
+/** Remove lead-ins people naturally say around an answer: "my name is Jay Shah" → "Jay Shah". */
+export function stripLeadIn(text: string): string {
+  const cut = text.replace(LEAD_EN, "").replace(LEAD_HI, "").replace(TRAIL, "").trim();
+  return cut || text;
+}
+
+/**
+ * Could this be someone's name? Speech-to-text turns short Indian names into
+ * letters ("Jay" → "G") or stray words; better to ask again than to fill "G".
+ */
+export function plausibleName(name: string): boolean {
+  if (!/^[\p{L}\p{M}][\p{L}\p{M}.'’ -]*$/u.test(name)) return false; // letters only, no digits
+  const words = name.split(/\s+/).filter(Boolean);
+  if (words.length > 6) return false;
+  if (!words.some((w) => w.replace(/[.'’-]/g, "").length >= 2)) return false; // "G", "J K"
+  return parseYesNo(name) === null; // "yes", "haan", "no" are answers to a different question
+}
+
 /** Parse an answer for a field. Typed answers are trusted more: they skip speech fixes. */
 export function parseAnswer(info: FieldInfo, text: string, typed = false): Parsed {
-  const raw = text.trim().replace(/[.!?।]+$/, "");
+  let raw = text.trim().replace(/[.!?।]+$/, "");
+  if (!typed) raw = stripLeadIn(raw);
   if (!raw) return { ok: false };
   switch (info.kind) {
     case "email":
@@ -206,7 +234,10 @@ export function parseAnswer(info: FieldInfo, text: string, typed = false): Parse
       return yes === null ? { ok: false } : { ok: true, value: yes ? "yes" : "no", display: yes ? "✓" : "✗" };
     }
     case "name": {
-      const name = typed ? raw : titleCase(raw);
+      let name = typed ? raw : titleCase(raw);
+      // Said in Hindi/Gujarati script, but the form is in English (e.g. name as on PAN).
+      if (hasIndicScript(name) && !hasIndicScript(info.label) && /[A-Za-z]/.test(info.label)) name = romaniseName(name);
+      if (!plausibleName(name)) return { ok: false };
       return { ok: true, value: name, display: name };
     }
     default:

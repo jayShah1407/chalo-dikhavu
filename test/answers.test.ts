@@ -99,3 +99,33 @@ describe("parseAnswer", () => {
     expect(parseAnswer(info("text"), "  ").ok).toBe(false);
   });
 });
+
+describe("names (speech-to-text is weakest here)", () => {
+  const name = (label = "Full name (as on PAN card)") => info("name", { label });
+
+  it("rejects what the recognizer makes of short names, instead of filling it", () => {
+    expect(parseAnswer(name(), "G").ok).toBe(false); // "Jay" heard as "G" (real report)
+    expect(parseAnswer(name(), "J K").ok).toBe(false);
+    expect(parseAnswer(name(), "yes").ok).toBe(false);
+    expect(parseAnswer(name(), "98250").ok).toBe(false);
+    expect(parseAnswer(name(), "R. K. Sharma")).toMatchObject({ value: "R. K. Sharma" }); // initials + surname are fine
+  });
+
+  it("strips lead-ins in English, Hinglish, Hindi and Gujarati", () => {
+    expect(parseAnswer(name(), "my name is jay shah")).toMatchObject({ value: "Jay Shah" });
+    expect(parseAnswer(name(), "mera naam Jay Shah hai")).toMatchObject({ value: "Jay Shah" });
+    expect(parseAnswer(name("Father's or spouse's name"), "mere papa ka naam Rakesh Shah hai")).toMatchObject({ value: "Rakesh Shah" });
+    expect(parseAnswer(info("email"), "my email is jay at gmail dot com")).toMatchObject({ value: "jay@gmail.com" });
+    expect(parseAnswer(info("phone"), "my mobile number is 98250 12345")).toMatchObject({ value: "9825012345" });
+    // Typed answers are taken as typed.
+    expect(parseAnswer(name(), "My Name Is Unusual", true)).toMatchObject({ value: "My Name Is Unusual" });
+  });
+
+  it("writes a Hindi- or Gujarati-script name in English letters on an English form", () => {
+    expect(parseAnswer(name(), "मेरा नाम जय शाह है")).toMatchObject({ value: "Jay Shah" });
+    expect(parseAnswer(name(), "प्रिया शर्मा")).toMatchObject({ value: "Priya Sharma" });
+    expect(parseAnswer(name(), "રાકેશ પટેલ")).toMatchObject({ value: "Rakesh Patel" });
+    // A form whose label is itself in Hindi keeps the script.
+    expect(parseAnswer(name("पूरा नाम"), "जय शाह")).toMatchObject({ value: "जय शाह" });
+  });
+});

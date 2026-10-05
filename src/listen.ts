@@ -8,6 +8,7 @@ interface RecognitionResultEvent {
 interface Recognition {
   lang: string;
   interimResults: boolean;
+  maxAlternatives: number;
   continuous: boolean;
   onresult: ((e: RecognitionResultEvent) => void) | null;
   onerror: ((e: { error: string }) => void) | null;
@@ -40,8 +41,11 @@ export type ListenStatus =
   | "aborted";
 
 export interface ListenResult {
+  /** The recognizer's best guess. */
   text: string;
   status: ListenStatus;
+  /** Its other guesses for the whole answer, best first. */
+  alternatives: string[];
 }
 
 export interface ListenOptions {
@@ -87,8 +91,8 @@ export function isEcho(heard: string, spoken: string | undefined): boolean {
 export function listenOnce(opts: ListenOptions): Promise<ListenResult> {
   const Ctor = recognitionCtor();
   const { signal } = opts;
-  if (!Ctor) return Promise.resolve({ text: "", status: "unavailable" });
-  if (signal.aborted) return Promise.resolve({ text: "", status: "aborted" });
+  if (!Ctor) return Promise.resolve({ text: "", status: "unavailable", alternatives: [] });
+  if (signal.aborted) return Promise.resolve({ text: "", status: "aborted", alternatives: [] });
   const waitMs = opts.waitMs ?? 8000;
   const silenceMs = opts.silenceMs ?? 1800;
   const maxMs = opts.maxMs ?? 25000;
@@ -100,11 +104,26 @@ export function listenOnce(opts: ListenOptions): Promise<ListenResult> {
     let stopping = false;
     let restarts = 0;
     let lastHeardAt = 0;
-    let heard = ""; // text from sessions that already ended
-    let current = ""; // text from the live session
+    // Each segment keeps all of the recognizer's guesses, best first.
+    let heardSegs: string[][] = []; // sessions that already ended
+    let currentSegs: string[][] = []; // the live session
     let failure: ListenStatus | null = null;
 
-    const text = () => `${heard} ${current}`.replace(/\s+/g, " ").trim();
+    const join = (parts: string[]) => parts.join(" ").replace(/\s+/g, " ").trim();
+    const allSegs = () => [...heardSegs, ...currentSegs];
+    const text = () => join(allSegs().map((s) => s[0]));
+    /** Whole-answer alternatives: the k-th guess of each segment (falling back to the best). */
+    const alternatives = () => {
+      const segs = allSegs();
+      const depth = Math.max(0, ...segs.map((s) => s.length));
+      const out: string[] = [];
+      for (let k = 1; k < depth; k++) {
+        const alt = join(segs.map((s) => s[k] ?? s[0]));
+        if (alt && alt !== text() && !out.includes(alt)) out.push(alt);
+      }
+      return out;
+    };
+    let heard = ""; // best text so far, for the end-of-session checks below
     const finish = (status: ListenStatus) => {
       if (settled) return;
       settled = true;
@@ -118,7 +137,8 @@ export function listenOnce(opts: ListenOptions): Promise<ListenResult> {
           /* already stopped */
         }
       }
-      resolve({ text: status === "ok" ? text() : "", status });
+      const ok = status === "ok";
+      resolve({ text: ok ? text() : "", status, alternatives: ok ? alternatives() : [] });
     };
     const onAbort = () => finish("aborted");
 
@@ -128,15 +148,24 @@ export function listenOnce(opts: ListenOptions): Promise<ListenResult> {
       r.lang = speechLocale(opts.lang);
       r.interimResults = true;
       r.continuous = true;
+      // Names especially: "Jay" often comes back as "G" first and "Jay" second.
+      r.maxAlternatives = 5;
       r.onresult = (e) => {
         // Chrome splits speech into segments at pauses. Drop any segment that is
         // just our own question coming back through the speakers.
-        let t = "";
+        const segs: string[][] = [];
         for (let i = 0; i < e.results.length; i++) {
-          const segment = e.results[i][0].transcript;
-          if (!isEcho(segment, opts.ignore)) t += segment + " ";
+          const result = e.results[i];
+          if (isEcho(result[0].transcript, opts.ignore)) continue;
+          const guesses: string[] = [];
+          for (let k = 0; k < result.length; k++) {
+            const g = result[k].transcript.trim();
+            if (g) guesses.push(g);
+          }
+          if (guesses.length) segs.push(guesses);
         }
-        current = t.trim();
+        currentSegs = segs;
+        const current = join(segs.map((s) => s[0]));
         if (current) {
           lastHeardAt = Date.now();
           opts.onInterim?.(text());
@@ -149,8 +178,9 @@ export function listenOnce(opts: ListenOptions): Promise<ListenResult> {
       };
       r.onend = () => {
         if (settled) return;
+        heardSegs = allSegs();
+        currentSegs = [];
         heard = text();
-        current = "";
         if (failure) return finish(failure);
         if (stopping) return finish(heard ? "ok" : "silent");
         // Ended by the browser, not us. Keep listening while there's time left.

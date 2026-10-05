@@ -87,6 +87,7 @@ type UiKey =
   | "micBlocked"
   | "micUnavailable"
   | "sayYesNo"
+  | "fixBelow"
   | "uploadYourself";
 
 const UI: Record<string, Record<UiKey, string>> = {
@@ -137,6 +138,7 @@ const UI: Record<string, Record<UiKey, string>> = {
     micBlocked: "The microphone is blocked. Allow it from the 🔒 icon in the address bar, or type your answer.",
     micUnavailable: "Voice isn't working right now. Please type your answer.",
     sayYesNo: "Please say yes or no, or tap a button.",
+    fixBelow: "Not quite? Fix it in the box below, or just say it again.",
     uploadYourself: "Please upload “{label}” yourself, then press Next.",
   },
   hi: {
@@ -186,6 +188,7 @@ const UI: Record<string, Record<UiKey, string>> = {
     micBlocked: "माइक्रोफ़ोन बंद है। एड्रेस बार में 🔒 आइकन से इसे चालू करें, या जवाब लिखें।",
     micUnavailable: "अभी आवाज़ काम नहीं कर रही। कृपया जवाब लिखें।",
     sayYesNo: "कृपया हाँ या नहीं बोलें, या बटन दबाएँ।",
+    fixBelow: "सही नहीं है? नीचे बॉक्स में ठीक करें, या फिर से बोलें।",
     uploadYourself: "कृपया “{label}” खुद अपलोड करें, फिर “आगे” दबाएँ।",
   },
   gu: {
@@ -235,6 +238,7 @@ const UI: Record<string, Record<UiKey, string>> = {
     micBlocked: "માઇક્રોફોન બંધ છે. એડ્રેસ બારમાં 🔒 આઇકનથી ચાલુ કરો, અથવા જવાબ લખો.",
     micUnavailable: "અત્યારે અવાજ કામ કરતો નથી. કૃપા કરીને જવાબ લખો.",
     sayYesNo: "કૃપા કરીને હા કે ના બોલો, અથવા બટન દબાવો.",
+    fixBelow: "બરાબર નથી? નીચેના બોક્સમાં સુધારો, અથવા ફરી બોલો.",
     uploadYourself: "કૃપા કરીને “{label}” જાતે અપલોડ કરો, પછી “આગળ” દબાવો.",
   },
 };

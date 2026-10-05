@@ -40,9 +40,10 @@ await page.addInitScript(() => {
       const tick = () => {
         if (this.closed) return;
         if (window.__say) {
-          this.segments.push(window.__say);
+          // A string, or an array of guesses (best first) like Chrome's maxAlternatives.
+          this.segments.push([].concat(window.__say));
           window.__say = null;
-          const results = this.segments.map((t) => Object.assign([{ transcript: t }], { isFinal: true }));
+          const results = this.segments.map((alts) => Object.assign(alts.map((transcript) => ({ transcript })), { isFinal: true }));
           this.onresult?.({ resultIndex: 0, results });
         } else if (!this.segments.length && Date.now() - began > 4000) {
           this.onerror?.({ error: "no-speech" });
@@ -97,8 +98,33 @@ await check("asking for KYC offers 'do it with me' and opens the KYC form", asyn
   await page.waitForURL("**/kyc", { timeout: 8000 });
 });
 
+const hintOf = () => page.locator(".bubble.on .answer-hint");
+const sayWhenListening = async (what) => {
+  await hintOf().filter({ hasText: "Listening" }).waitFor({ timeout: 6000 });
+  await page.evaluate((w) => (window.__say = w), what);
+};
+
+await check("name heard as 'G' (real report): not accepted, asked again", async () => {
+  await expectBubble("What's your full name (as on PAN card)?");
+  await sayWhenListening("G");
+  await expectBubble("Sorry, I didn't catch that", 8000);
+});
+
+await check("name: the recognizer's second guess is used when the first makes no sense", async () => {
+  await sayWhenListening(["G", "Jay Sha"]);
+  await expectBubble("I heard: Jay Sha", 8000);
+});
+
+await check("name: fix the read-back by typing, without speaking again", async () => {
+  const box = page.locator(".bubble.on .answer input");
+  if ((await box.inputValue()) !== "Jay Sha") throw new Error("heard value not pre-filled for editing");
+  await box.fill("Jay Shah");
+  await box.press("Enter");
+  await expectBubble("What's your date of birth?", 8000);
+  if ((await page.locator("#fullName").inputValue()) !== "Jay Shah") throw new Error("corrected name not filled");
+});
+
 await check("step 1: personal details from generated questions", async () => {
-  await answer("What's your full name (as on PAN card)?", "Jay Shah");
   await answer("What's your date of birth?", "14/07/1998");
   await answer("Which marital status?", "single");
   await answer("Which gender? You can say: Male, Female, Transgender.", "male");

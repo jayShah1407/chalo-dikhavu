@@ -30,6 +30,8 @@ export interface BubbleButton {
 export interface AnswerBox {
   placeholder: string;
   type?: string;
+  /** Pre-filled text the user can edit (the heard value, in a read-back). */
+  value?: string;
   onSubmit: (text: string) => void;
   /** The user started typing: stop listening so the two don't race. */
   onTyping?: () => void;
@@ -240,6 +242,7 @@ export class Overlay {
     this.answerMic = null;
     if (answer) {
       const input = h("input", { type: answer.type ?? "text", placeholder: answer.placeholder, autocomplete: "off" });
+      if (answer.value) input.value = answer.value;
       input.addEventListener("keydown", (e) => e.stopPropagation()); // Space here is typing, not push-to-talk
       input.addEventListener("input", () => answer.onTyping?.());
       const parts: Node[] = [input];
