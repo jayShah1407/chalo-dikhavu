@@ -1,8 +1,8 @@
-// Runs after raahi.global.js (window.Raahi) and flows.js (RAAHI_FLOWS).
-Raahi.init({
-  flows: globalThis.RAAHI_FLOWS,
+// Runs after chalo-dikhavu.global.js (window.ChaloDikhavu) and flows.js (DIKHAVU_FLOWS).
+ChaloDikhavu.init({
+  flows: globalThis.DIKHAVU_FLOWS,
   language: "en",
   languages: ["en", "hi"],
   color: "#0b5fd9",
-  onEvent: (e) => console.debug("[raahi]", e),
+  onEvent: (e) => console.debug("[chalo-dikhavu]", e),
 });

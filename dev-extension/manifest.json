@@ -1,12 +1,12 @@
 {
   "manifest_version": 3,
-  "name": "Raahi Dev Loader",
+  "name": "Chalo Dikhavu Dev Loader",
   "version": "0.1.0",
-  "description": "Injects the local Raahi build and demo flows into a local site for testing, without changing the site's code.",
+  "description": "Injects the local Chalo Dikhavu build and demo flows into a local site for testing, without changing the site's code.",
   "content_scripts": [
     {
       "matches": ["http://localhost:3001/*"],
-      "js": ["raahi.global.js", "flows.js", "boot.js"],
+      "js": ["chalo-dikhavu.global.js", "flows.js", "boot.js"],
       "run_at": "document_idle"
     }
   ]

@@ -11,10 +11,10 @@ export default defineConfig([
     target: "es2020",
   },
   {
-    // <script> tag / CDN / dev extension: exposes window.Raahi.
-    entry: { raahi: "src/index.ts" },
+    // <script> tag / CDN / dev extension: exposes window.ChaloDikhavu.
+    entry: { "chalo-dikhavu": "src/index.ts" },
     format: ["iife"],
-    globalName: "Raahi",
+    globalName: "ChaloDikhavu",
     minify: true,
     target: "es2020",
   },

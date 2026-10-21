@@ -1,17 +1,17 @@
-// Raahi setup for the Bharat Demo Bank KYC demo.
+// Chalo Dikhavu setup for the Bharat Demo Bank KYC demo.
 //
-// The whole 5-step KYC is described with one `form:` step per wizard page. Raahi reads
+// The whole 5-step KYC is described with one `form:` step per wizard page. Chalo Dikhavu reads
 // each field and writes the questions itself. The bank only adds:
 //   - `knowledge`: what the AI may use to answer "why?" questions,
 //   - `why`: exact, pre-approved answers for the most-asked fields (free; no AI call),
-//   - `confirm: "auto"` on the "Continue" buttons, so Raahi may press those for the
+//   - `confirm: "auto"` on the "Continue" buttons, so Chalo Dikhavu may press those for the
 //     user. The final "Submit KYC" is still pressed by the user.
 //
 // The knowledge below is illustrative text for a fictional bank. A real bank should use
 // text reviewed by its own compliance team.
 
-globalThis.RAAHI_BANK_KNOWLEDGE = `
-About: Bharat Demo Bank is a fictional bank used to demonstrate Raahi. Support: call 1800-000-0000 (demo number) or email support@bharatdemobank.example.
+globalThis.DIKHAVU_BANK_KNOWLEDGE = `
+About: Bharat Demo Bank is a fictional bank used to demonstrate Chalo Dikhavu. Support: call 1800-000-0000 (demo number) or email support@bharatdemobank.example.
 
 What KYC is and why it's needed:
 KYC means Know Your Customer: the bank verifies who you are and where you live. Every bank in India must do this under the Prevention of Money Laundering Act, 2002 and the Reserve Bank of India's KYC Master Direction. It makes sure the account really belongs to you, protects you if someone tries to open or use an account in your name, and helps stop fraud, money laundering and terrorist financing. Bharat Demo Bank limits some services on accounts whose KYC is pending, and asks customers to update KYC from time to time (re-KYC).
@@ -63,7 +63,7 @@ const WHY = {
   },
 };
 
-globalThis.RAAHI_FLOWS = [
+globalThis.DIKHAVU_FLOWS = [
   {
     id: "complete-kyc",
     title: { en: "Complete your KYC", hi: "अपना KYC पूरा करें", gu: "તમારું KYC પૂર્ણ કરો" },

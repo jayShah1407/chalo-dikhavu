@@ -1,7 +1,7 @@
-import { Raahi } from "./raahi";
-import type { RaahiOptions } from "./types";
+import { ChaloDikhavu } from "./engine";
+import type { ChaloDikhavuOptions } from "./types";
 
-export { Raahi };
+export { ChaloDikhavu };
 export { rankFlows, resolve } from "./intent";
 export { findNow, waitFor } from "./finder";
 export { matchPath } from "./paths";
@@ -13,8 +13,8 @@ export type {
   FieldOptions,
   Flow,
   LocalizedText,
-  RaahiEvent,
-  RaahiOptions,
+  ChaloDikhavuEvent,
+  ChaloDikhavuOptions,
   RunMode,
   Step,
   Target,
@@ -22,6 +22,6 @@ export type {
 } from "./types";
 
 /** Create and mount a guide in one call: `const guide = init({ flows })`. */
-export function init(options: RaahiOptions): Raahi {
-  return new Raahi(options).mount();
+export function init(options: ChaloDikhavuOptions): ChaloDikhavu {
+  return new ChaloDikhavu(options).mount();
 }

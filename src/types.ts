@@ -35,13 +35,13 @@ export interface Step extends FieldOptions {
   target?: Target;
   /**
    * Page this step lives on, e.g. "/student/teachers" or "/student/teachers/:id".
-   * If the user is elsewhere, Raahi navigates there (static paths) or waits
+   * If the user is elsewhere, Chalo Dikhavu navigates there (static paths) or waits
    * for them to arrive (paths with :params).
    */
   path?: string;
   /**
    * What the guide says and shows in the bubble. Optional for `action` and
-   * `form` steps: Raahi writes it from the field's label ("Enter your email here").
+   * `form` steps: Chalo Dikhavu writes it from the field's label ("Enter your email here").
    */
   say?: LocalizedText;
   /** Pre-recorded audio URL(s). Falls back to text-to-speech when missing. */
@@ -53,14 +53,14 @@ export interface Step extends FieldOptions {
   timeout?: number;
 
   /**
-   * In "do it with me" mode, Raahi performs this on the target instead of
+   * In "do it with me" mode, Chalo Dikhavu performs this on the target instead of
    * waiting for the user: "click" it, or "fill" it (text, select, radio or
    * checkbox; the question is generated from the field unless `ask` is given).
    * In "just show me" mode the step is shown like any other.
    */
   action?: "click" | "fill";
   /**
-   * A whole form: Raahi finds every field in it, in order, asks for each value
+   * A whole form: Chalo Dikhavu finds every field in it, in order, asks for each value
    * and fills it, then points at the submit button. Per-field tweaks go in `fields`.
    */
   form?: Target;
@@ -114,7 +114,7 @@ export type RunMode =
   /** Ask the user for values and click/fill on their behalf. */
   | "do";
 
-export type RaahiEvent =
+export type ChaloDikhavuEvent =
   | { type: "flow:start"; flowId: string; mode: RunMode }
   | { type: "flow:end"; flowId: string; completed: boolean }
   | { type: "step:show"; flowId: string; index: number }
@@ -148,16 +148,16 @@ export interface ExplainRequest {
 export interface AiOptions {
   /**
    * POST endpoint that takes an ExplainRequest and returns `{ answer }`.
-   * Either your own server (see `raahi/server`) or Raahi Cloud.
+   * Either your own server (see `chalo-dikhavu/server`) or Chalo Dikhavu Cloud.
    */
   endpoint?: string;
-  /** Raahi Cloud project key (public, origin-restricted). Sent as a Bearer token. */
+  /** Chalo Dikhavu Cloud project key (public, origin-restricted). Sent as a Bearer token. */
   projectKey?: string;
   /** Or answer in code instead of over HTTP. Takes precedence over `endpoint`. */
   answer?: (req: ExplainRequest) => Promise<string>;
 }
 
-export interface RaahiOptions {
+export interface ChaloDikhavuOptions {
   flows: Flow[];
   /** Starting language code. Default "en". */
   language?: string;
@@ -182,7 +182,7 @@ export interface RaahiOptions {
    * push for the smoothest result, e.g. (p) => router.push(p).
    */
   navigate?: (path: string) => void;
-  onEvent?: (event: RaahiEvent) => void;
+  onEvent?: (event: ChaloDikhavuEvent) => void;
   /**
    * Answer users' questions ("what is KYC for?", "why do you need my PAN?")
    * with an AI model. Without it, only fields' own `why` text is used.

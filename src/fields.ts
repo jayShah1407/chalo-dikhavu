@@ -182,7 +182,7 @@ export function describeField(input: Element): FieldInfo {
   };
 }
 
-/** Is this a control Raahi can fill? */
+/** Is this a control Chalo Dikhavu can fill? */
 function isField(el: Element): boolean {
   const input = el as HTMLInputElement;
   if (input.disabled || input.readOnly) return false;

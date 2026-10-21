@@ -1,9 +1,9 @@
 /**
- * raahi/server — answer users' "why is this needed?" questions with Claude,
+ * chalo-dikhavu/server — answer users' "why is this needed?" questions with Claude,
  * from your own backend. Your Anthropic API key stays on the server; the
  * browser only ever talks to your endpoint.
  *
- *   import { createExplainer, createNodeHandler } from "raahi/server";
+ *   import { createExplainer, createNodeHandler } from "chalo-dikhavu/server";
  *   const explain = createExplainer();              // reads ANTHROPIC_API_KEY
  *   http.createServer(createNodeHandler(explain));  // or mount in Express / Next
  */
@@ -226,7 +226,7 @@ export function createNodeHandler(explain: Explainer, options: HandlerOptions = 
       // The SDK already retried 429/5xx twice; pass rate limits through so callers can back off.
       const status = (e as { status?: number }).status;
       if (status === 429) return send(res, 429, { error: "rate limited, try again shortly" }, cors);
-      console.error("raahi/server: explain failed", e);
+      console.error("chalo-dikhavu/server: explain failed", e);
       send(res, 502, { error: "upstream error" }, cors);
     }
   };

@@ -58,7 +58,7 @@ interface Point {
 const easeInOut = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 
 /**
- * Everything Raahi draws. Lives in a shadow root so the host site's CSS can't
+ * Everything Chalo Dikhavu draws. Lives in a shadow root so the host site's CSS can't
  * break it and ours can't leak out. One rAF loop keeps the spotlight, bubble
  * and cursor glued to the target element as the page scrolls or re-renders.
  */
@@ -98,7 +98,7 @@ export class Overlay {
     private readonly handlers: OverlayHandlers,
   ) {
     this.lang = lang;
-    this.host = h("div", { "data-raahi-root": "" });
+    this.host = h("div", { "data-dikhavu-root": "" });
     this.root = this.host.attachShadow({ mode: "open" });
 
     this.spot = h("div", { class: "spot" });
@@ -177,7 +177,7 @@ export class Overlay {
     this.host.remove();
   }
 
-  /** True when an event came from inside Raahi's own UI. */
+  /** True when an event came from inside Chalo Dikhavu's own UI. */
   owns(e: Event): boolean {
     return e.composedPath().includes(this.host);
   }

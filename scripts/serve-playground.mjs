@@ -4,7 +4,7 @@ import { readFile } from "node:fs/promises";
 
 const PORT = Number(process.env.PORT ?? 4400);
 const files = {
-  "/raahi.global.js": "dist/raahi.global.js",
+  "/chalo-dikhavu.global.js": "dist/chalo-dikhavu.global.js",
   "/flows.js": "examples/tution-techer/flows.js",
   "/bank-flows.js": "examples/bank-demo/flows.js",
 };
@@ -14,11 +14,11 @@ createServer(async (req, res) => {
   const file = files[path];
   try {
     let body = await readFile(file ?? "examples/playground/index.html", "utf-8");
-    // BARE=1 serves the page without Raahi, to test injection by the dev extension.
-    if (!file && process.env.BARE) body = body.replace(/<script src="\/raahi[\s\S]*<\/script>\s*(?=<\/body>)/, "");
+    // BARE=1 serves the page without Chalo Dikhavu, to test injection by the dev extension.
+    if (!file && process.env.BARE) body = body.replace(/<script src="\/chalo-dikhavu[\s\S]*<\/script>\s*(?=<\/body>)/, "");
     res.writeHead(200, { "content-type": file ? "text/javascript" : "text/html; charset=utf-8" });
     res.end(body);
   } catch {
     res.writeHead(404).end("Run `npm run build` first.");
   }
-}).listen(PORT, () => console.log(`Raahi playground: http://localhost:${PORT}/student`));
+}).listen(PORT, () => console.log(`Chalo Dikhavu playground: http://localhost:${PORT}/student`));

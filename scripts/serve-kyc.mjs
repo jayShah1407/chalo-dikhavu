@@ -1,5 +1,5 @@
 // Bharat Demo Bank KYC demo on http://localhost:4500, standing in for the bank's own server:
-// it serves the site and answers /api/explain with raahi/server ("bring your own key").
+// it serves the site and answers /api/explain with chalo-dikhavu/server ("bring your own key").
 //
 //   ANTHROPIC_API_KEY=... node scripts/serve-kyc.mjs     real answers from Claude
 //   node scripts/serve-kyc.mjs                           no key: offline demo answers, no cost
@@ -8,7 +8,7 @@ import { readFile } from "node:fs/promises";
 import { createExplainer, createMockExplainer, createNodeHandler } from "../dist/server.js";
 
 const PORT = Number(process.env.PORT ?? 4500);
-const real = !!process.env.ANTHROPIC_API_KEY && !process.env.RAAHI_MOCK_AI;
+const real = !!process.env.ANTHROPIC_API_KEY && !process.env.DIKHAVU_MOCK_AI;
 const explain = real
   ? createExplainer({ instructions: "You are helping customers of Bharat Demo Bank complete their KYC." })
   : createMockExplainer();
@@ -17,7 +17,7 @@ const api = createNodeHandler(explain, {
 });
 
 const files = {
-  "/raahi.global.js": ["dist/raahi.global.js", "text/javascript"],
+  "/chalo-dikhavu.global.js": ["dist/chalo-dikhavu.global.js", "text/javascript"],
   "/kyc-flows.js": ["examples/bank-kyc/kyc-flows.js", "text/javascript"],
 };
 

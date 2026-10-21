@@ -13,9 +13,9 @@ export function css(color: string): string {
 .spot.on { opacity: 1; }
 .spot.on::after {
   content: ""; position: absolute; inset: -6px; border-radius: 14px;
-  border: 2px solid ${color}; animation: raahi-pulse 1.6s ease-out infinite;
+  border: 2px solid ${color}; animation: dikhavu-pulse 1.6s ease-out infinite;
 }
-@keyframes raahi-pulse { from { opacity: .8; transform: scale(1); } to { opacity: 0; transform: scale(1.12); } }
+@keyframes dikhavu-pulse { from { opacity: .8; transform: scale(1); } to { opacity: 0; transform: scale(1.12); } }
 
 .cursor {
   position: fixed; left: 0; top: 0; width: 28px; height: 28px; opacity: 0;
@@ -28,8 +28,8 @@ export function css(color: string): string {
   position: absolute; left: -10px; top: -10px; width: 20px; height: 20px; border-radius: 50%;
   border: 3px solid ${color}; opacity: 0;
 }
-.cursor.tap .ring { animation: raahi-tap .6s ease-out; }
-@keyframes raahi-tap { from { opacity: 1; transform: scale(.4); } to { opacity: 0; transform: scale(2.2); } }
+.cursor.tap .ring { animation: dikhavu-tap .6s ease-out; }
+@keyframes dikhavu-tap { from { opacity: 1; transform: scale(.4); } to { opacity: 0; transform: scale(2.2); } }
 
 .bubble {
   position: fixed; width: 300px; max-width: calc(100vw - 24px); pointer-events: auto;
@@ -52,7 +52,7 @@ export function css(color: string): string {
 .bubble .answer-hint[data-state="listening"] { color: #dc2626; font-weight: 600; }
 .bubble .answer-hint[data-state="listening"]::before {
   content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #ef4444;
-  margin-right: 6px; vertical-align: 1px; animation: raahi-orb 1s ease-in-out infinite;
+  margin-right: 6px; vertical-align: 1px; animation: dikhavu-orb 1s ease-in-out infinite;
 }
 .bubble .answer-hint[data-state="problem"] { color: #b45309; }
 .bubble .actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; flex-wrap: wrap; }
@@ -114,8 +114,8 @@ button.icon:hover { background: #f1f5f9; }
   box-shadow: 0 12px 36px rgba(0,0,0,.35);
 }
 .listening.on { display: flex; }
-.listening .orb { width: 30px; height: 30px; flex: none; border-radius: 50%; background: #ef4444; display: grid; place-items: center; animation: raahi-orb 1s ease-in-out infinite; }
-@keyframes raahi-orb { 50% { box-shadow: 0 0 0 8px rgba(239, 68, 68, .25); } }
+.listening .orb { width: 30px; height: 30px; flex: none; border-radius: 50%; background: #ef4444; display: grid; place-items: center; animation: dikhavu-orb 1s ease-in-out infinite; }
+@keyframes dikhavu-orb { 50% { box-shadow: 0 0 0 8px rgba(239, 68, 68, .25); } }
 .listening .heard { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 @media (prefers-reduced-motion: reduce) {

@@ -93,7 +93,7 @@
   </style>
 </head>
 <body>
-  <div class="demo-banner">Demo site for testing Raahi. Bharat Demo Bank is fictional. Don't enter real personal details.</div>
+  <div class="demo-banner">Demo site for testing Chalo Dikhavu. Bharat Demo Bank is fictional. Don't enter real personal details.</div>
   <header class="top">
     <div class="bar">
       <a class="brand" href="/"><span class="mark">B</span> Bharat Demo Bank</a>
@@ -326,24 +326,24 @@
     render();
   </script>
 
-  <!-- Raahi: the only lines a bank adds. -->
-  <script src="/raahi.global.js"></script>
+  <!-- Chalo Dikhavu: the only lines a bank adds. -->
+  <script src="/chalo-dikhavu.global.js"></script>
   <script src="/kyc-flows.js"></script>
   <script>
     const params = new URLSearchParams(location.search);
-    window.guide = Raahi.init({
-      flows: RAAHI_FLOWS,
-      knowledge: RAAHI_BANK_KNOWLEDGE,
+    window.guide = ChaloDikhavu.init({
+      flows: DIKHAVU_FLOWS,
+      knowledge: DIKHAVU_BANK_KNOWLEDGE,
       language: "en",
       languages: ["en", "hi", "gu"],
       color: "#1356c4",
       tts: !params.has("quiet"),
       // Default: the bank's own backend answers (key stays on its server).
-      // ?cloud: use hosted Raahi Cloud with a public project key instead.
+      // ?cloud: use hosted Chalo Dikhavu Cloud with a public project key instead.
       ai: params.has("cloud")
-        ? { endpoint: "http://localhost:4600/v1/explain", projectKey: "rh_pub_demo_bharat_bank" }
+        ? { endpoint: "http://localhost:4600/v1/explain", projectKey: "cd_pub_demo_bharat_bank" }
         : { endpoint: "/api/explain" },
-      onEvent: (e) => console.debug("[raahi]", e),
+      onEvent: (e) => console.debug("[chalo-dikhavu]", e),
     });
   </script>
 </body>

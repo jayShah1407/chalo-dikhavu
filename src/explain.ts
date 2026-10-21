@@ -66,7 +66,7 @@ export class AiUnavailable extends Error {}
 /** Ask the configured AI. Throws on network errors, quota exhaustion and timeouts. */
 export async function callAi(ai: AiOptions, req: ExplainRequest, signal?: AbortSignal): Promise<string> {
   if (ai.answer) return (await ai.answer(req)).trim();
-  if (!ai.endpoint) throw new AiUnavailable("raahi: ai.endpoint or ai.answer is required");
+  if (!ai.endpoint) throw new AiUnavailable("chalo-dikhavu: ai.endpoint or ai.answer is required");
   const timeout = new AbortController();
   const timer = setTimeout(() => timeout.abort(), 30000);
   signal?.addEventListener("abort", () => timeout.abort(), { once: true });

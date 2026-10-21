@@ -41,7 +41,7 @@ async function expectCursorOn(selector) {
   }
 }
 
-console.log("Raahi e2e");
+console.log("Chalo Dikhavu e2e");
 await page.goto(`${BASE}/student`);
 
 await check("typed question starts the matching flow", async () => {
@@ -129,7 +129,7 @@ await check("missing element shows a friendly message, not a crash", async () =>
 page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
 page.on("pageerror", (e) => errors.push(e.message));
 await page.addInitScript(() => {
-  // Newer Chrome has the unprefixed API too, and Raahi prefers it: replace both.
+  // Newer Chrome has the unprefixed API too, and Chalo Dikhavu prefers it: replace both.
   window.SpeechRecognition = window.webkitSpeechRecognition = class {
     start() {
       const tick = () => {

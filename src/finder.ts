@@ -2,7 +2,7 @@ import type { Target, TargetSpec } from "./types";
 
 /** Elements a text-only target can point at. Keeps "Subject" from matching a whole card. */
 const POINTABLE =
-  'a, button, label, input, select, textarea, summary, [role="button"], [role="tab"], [role="link"], [role="menuitem"], [data-raahi], h1, h2, h3, h4';
+  'a, button, label, input, select, textarea, summary, [role="button"], [role="tab"], [role="link"], [role="menuitem"], [data-dikhavu], h1, h2, h3, h4';
 
 function norm(s: string | null | undefined): string {
   return (s ?? "").replace(/\s+/g, " ").trim().toLowerCase();
@@ -22,7 +22,7 @@ function labelsOf(el: Element): string[] {
     el.getAttribute("aria-label"),
     el.getAttribute("title"),
     el.getAttribute("placeholder"),
-    el.getAttribute("data-raahi"),
+    el.getAttribute("data-dikhavu"),
     input.type === "submit" || input.type === "button" ? input.value : null,
   ].map(norm);
 }

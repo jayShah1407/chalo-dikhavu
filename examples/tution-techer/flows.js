@@ -4,7 +4,7 @@
 
 const NAV = (href) => `aside a[href="${href}"]`;
 
-globalThis.RAAHI_FLOWS = [
+globalThis.DIKHAVU_FLOWS = [
   {
     id: "find-teacher",
     title: { en: "Find a teacher", hi: "टीचर कैसे ढूंढें" },

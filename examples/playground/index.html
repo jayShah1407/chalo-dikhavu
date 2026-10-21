@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Raahi playground</title>
+  <title>Chalo Dikhavu playground</title>
   <!-- A tiny single-page app shaped like the Tution Techer student portal,
        so flows can be tried without running that project. -->
   <style>
@@ -118,13 +118,13 @@
     addEventListener("popstate", render);
     render();
   </script>
-  <script src="/raahi.global.js"></script>
+  <script src="/chalo-dikhavu.global.js"></script>
   <script src="/flows.js"></script>
   <script src="/bank-flows.js"></script>
   <script>
     // ?quiet turns off text-to-speech (used by the automated tests).
     const quiet = new URLSearchParams(location.search).has("quiet");
-    window.guide = Raahi.init({ flows: RAAHI_FLOWS, language: "en", languages: ["en", "hi"], color: "#0b5fd9", tts: !quiet });
+    window.guide = ChaloDikhavu.init({ flows: DIKHAVU_FLOWS, language: "en", languages: ["en", "hi"], color: "#0b5fd9", tts: !quiet });
   </script>
 </body>
 </html>

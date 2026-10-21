@@ -6,7 +6,7 @@ import { pick, ui } from "./i18n";
 import { listenOnce } from "./listen";
 import type { AnswerBox, BubbleButton, Overlay } from "./overlay";
 import { buttonLabel, questionFor } from "./prompts";
-import type { FieldOptions, LocalizedText, RaahiEvent } from "./types";
+import type { FieldOptions, LocalizedText, ChaloDikhavuEvent } from "./types";
 import type { Speaker } from "./voice";
 
 /**
@@ -28,9 +28,9 @@ export interface AssistHost {
   voice: boolean;
   /** The mic was blocked: stop trying voice for the rest of this session. */
   disableVoice(): void;
-  /** Listening timings from RaahiOptions.speech. */
+  /** Listening timings from ChaloDikhavuOptions.speech. */
   speech?: { waitMs?: number; silenceMs?: number };
-  emit(event: RaahiEvent): void;
+  emit(event: ChaloDikhavuEvent): void;
   stopButton(): BubbleButton;
   /**
    * While a question is open, push-to-talk transcripts go to `sink` instead of

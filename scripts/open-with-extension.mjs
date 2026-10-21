@@ -9,7 +9,7 @@ import { join, resolve } from "node:path";
 
 const url = process.argv[2] ?? "http://localhost:3001/student";
 const ext = resolve("dev-extension");
-const context = await chromium.launchPersistentContext(mkdtempSync(join(tmpdir(), "raahi-")), {
+const context = await chromium.launchPersistentContext(mkdtempSync(join(tmpdir(), "chalo-dikhavu-")), {
   channel: "chromium",
   headless: !!process.env.HEADLESS,
   viewport: null,
@@ -19,8 +19,8 @@ const page = context.pages()[0] ?? (await context.newPage());
 await page.goto(url);
 
 if (process.env.HEADLESS) {
-  // Smoke check: the extension injected Raahi and it can run a flow.
-  await page.locator("[data-raahi-root]").waitFor({ state: "attached", timeout: 10000 });
+  // Smoke check: the extension injected Chalo Dikhavu and it can run a flow.
+  await page.locator("[data-dikhavu-root]").waitFor({ state: "attached", timeout: 10000 });
   await page.locator(".launcher").click();
   await page.locator(".panel input").fill("refund kab milega");
   await page.locator(".panel input").press("Enter");
@@ -28,6 +28,6 @@ if (process.env.HEADLESS) {
   console.log("extension OK: injected and started the wallet flow");
   await context.close();
 } else {
-  console.log(`Opened ${url} with the Raahi dev extension. Close the window to exit.`);
+  console.log(`Opened ${url} with the Chalo Dikhavu dev extension. Close the window to exit.`);
   await new Promise((r) => context.on("close", r));
 }

@@ -1,4 +1,4 @@
-// Raahi Cloud (prototype): hosted AI answers for sites that don't run their own backend.
+// Chalo Dikhavu Cloud (prototype): hosted AI answers for sites that don't run their own backend.
 //
 //   POST /v1/explain   Authorization: Bearer <project key>   body: ExplainRequest  → { answer, usage }
 //   GET  /v1/usage     Authorization: Bearer <project key>                         → { used, free, remaining, billing }
@@ -7,7 +7,7 @@
 // allowance, and a running token count. When the allowance is used up and billing isn't
 // enabled, requests get 402 and the SDK tells the user politely that answers are unavailable.
 //
-// Run:  ANTHROPIC_API_KEY=... node cloud/server.mjs        (RAAHI_MOCK_AI=1 for no key / no cost)
+// Run:  ANTHROPIC_API_KEY=... node cloud/server.mjs        (DIKHAVU_MOCK_AI=1 for no key / no cost)
 // Data: cloud/data/projects.json (created from projects.example.json on first run)
 
 import { createServer } from "node:http";
@@ -17,12 +17,12 @@ import { fileURLToPath } from "node:url";
 import { corsHeaders, createExplainer, createMockExplainer, readJson, validateRequest } from "../dist/server.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const DATA = process.env.RAAHI_CLOUD_DATA ?? join(here, "data");
+const DATA = process.env.DIKHAVU_CLOUD_DATA ?? join(here, "data");
 const PROJECTS = join(DATA, "projects.json");
 const USAGE_LOG = join(DATA, "usage.log");
 const PORT = Number(process.env.PORT ?? 4600);
 /** Tokens each new project gets free. */
-export const DEFAULT_FREE_TOKENS = Number(process.env.RAAHI_FREE_TOKENS ?? 5000);
+export const DEFAULT_FREE_TOKENS = Number(process.env.DIKHAVU_FREE_TOKENS ?? 5000);
 
 mkdirSync(DATA, { recursive: true });
 if (!existsSync(PROJECTS)) copyFileSync(join(here, "projects.example.json"), PROJECTS);
@@ -34,11 +34,11 @@ function saveProjects(projects) {
   writeFileSync(PROJECTS, JSON.stringify(projects, null, 2));
 }
 
-const explain = process.env.RAAHI_MOCK_AI ? createMockExplainer() : createExplainer();
+const explain = process.env.DIKHAVU_MOCK_AI ? createMockExplainer() : createExplainer();
 
 // Simple per-key rate limit: a burst guard, not billing.
 const WINDOW_MS = 60_000;
-const MAX_PER_WINDOW = Number(process.env.RAAHI_RATE_LIMIT ?? 30);
+const MAX_PER_WINDOW = Number(process.env.DIKHAVU_RATE_LIMIT ?? 30);
 const hits = new Map();
 function rateLimited(key) {
   const now = Date.now();
@@ -114,7 +114,7 @@ export const server = createServer(async (req, res) => {
     result = await explain(body);
   } catch (e) {
     if (e?.status === 429) return send(res, 429, { error: "rate limited, try again shortly" }, cors);
-    console.error("raahi cloud: explain failed", e);
+    console.error("chalo-dikhavu cloud: explain failed", e);
     return send(res, 502, { error: "upstream error" }, cors);
   }
 
@@ -131,6 +131,6 @@ export const server = createServer(async (req, res) => {
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   server.listen(PORT, () => {
-    console.log(`Raahi Cloud (prototype) on http://localhost:${PORT}  ${process.env.RAAHI_MOCK_AI ? "[mock AI]" : "[Claude]"}`);
+    console.log(`Chalo Dikhavu Cloud (prototype) on http://localhost:${PORT}  ${process.env.DIKHAVU_MOCK_AI ? "[mock AI]" : "[Claude]"}`);
   });
 }

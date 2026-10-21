@@ -1,4 +1,4 @@
-// End-to-end: the Bharat Demo Bank KYC, done with Raahi in "do it with me" mode, in real Chrome.
+// End-to-end: the Bharat Demo Bank KYC, done with Chalo Dikhavu in "do it with me" mode, in real Chrome.
 // Starts its own demo server with offline AI answers (no API key, no cost).
 // Usage: npm run build && node test/e2e-kyc.mjs      (HEADED=1 to watch)
 import { spawn } from "node:child_process";
@@ -11,7 +11,7 @@ const PORT = 4501;
 const BASE = `http://localhost:${PORT}`;
 const CHROME = process.env.CHROME ?? "C:/Program Files/Google/Chrome/Application/chrome.exe";
 
-const server = spawn(process.execPath, ["scripts/serve-kyc.mjs"], { env: { ...process.env, PORT: String(PORT), RAAHI_MOCK_AI: "1" }, stdio: "pipe" });
+const server = spawn(process.execPath, ["scripts/serve-kyc.mjs"], { env: { ...process.env, PORT: String(PORT), DIKHAVU_MOCK_AI: "1" }, stdio: "pipe" });
 await new Promise((resolve, reject) => {
   server.stdout.on("data", (d) => String(d).includes("KYC demo") && resolve());
   server.on("exit", (code) => reject(new Error(`server exited ${code}`)));
@@ -88,7 +88,7 @@ async function answer(question, text) {
 }
 const bubbleButton = (label) => page.locator(".bubble.on button", { hasText: label });
 
-console.log("Raahi KYC e2e");
+console.log("Chalo Dikhavu KYC e2e");
 await page.goto(`${BASE}/?quiet`);
 
 await check("asking for KYC offers 'do it with me' and opens the KYC form", async () => {
@@ -135,7 +135,7 @@ const hint = () => page.locator(".bubble.on .answer-hint");
 await check("silence: a clear 'didn't hear anything' message, not a frozen flow; 🎤 listens again", async () => {
   await expectBubble("What's your father's or spouse's name?");
   await hint().filter({ hasText: "Listening" }).waitFor({ timeout: 3000 });
-  // Nobody speaks. Chrome ends its session after ~4 s; Raahi keeps listening up to 8 s, then says so.
+  // Nobody speaks. Chrome ends its session after ~4 s; Chalo Dikhavu keeps listening up to 8 s, then says so.
   await hint().filter({ hasText: "didn't hear anything" }).waitFor({ timeout: 12000 });
   await page.locator(".bubble.on .answer .mic").click();
   await hint().filter({ hasText: "Listening" }).waitFor({ timeout: 2000 });
@@ -158,7 +158,7 @@ await check("typed answer after voice ones", async () => {
   await answer("What's your email?", "jay@example.com");
 });
 
-await check("Raahi presses 'Continue' between steps (confirm: auto)", async () => {
+await check("Chalo Dikhavu presses 'Continue' between steps (confirm: auto)", async () => {
   await expectBubble("What's your PAN?");
   await page.locator("#kyc-identity.current").waitFor({ timeout: 3000 });
 });

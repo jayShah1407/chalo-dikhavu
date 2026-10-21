@@ -1,6 +1,6 @@
 node_modules/
 dist/
-dev-extension/raahi.global.js
+dev-extension/chalo-dikhavu.global.js
 *.tgz
 dev-extension/flows.js
 test/e2e-fail-*.png

@@ -1,7 +1,7 @@
 [
   {
     "name": "Bharat Demo Bank (local)",
-    "key": "rh_pub_demo_bharat_bank",
+    "key": "cd_pub_demo_bharat_bank",
     "allowedOrigins": ["http://localhost:4500"],
     "freeTokens": 5000,
     "usedTokens": 0,

@@ -8,11 +8,11 @@ import { canListen, Listener } from "./listen";
 import { Overlay, type BubbleButton } from "./overlay";
 import { isStaticPath, matchPath } from "./paths";
 import { buttonLabel, guideTextFor } from "./prompts";
-import type { Flow, LocalizedText, RaahiEvent, RaahiOptions, RunMode, Step } from "./types";
+import type { Flow, LocalizedText, ChaloDikhavuEvent, ChaloDikhavuOptions, RunMode, Step } from "./types";
 import { Speaker } from "./voice";
 
-const STATE_KEY = "raahi:run";
-const LANG_KEY = "raahi:lang";
+const STATE_KEY = "chalo-dikhavu:run";
+const LANG_KEY = "chalo-dikhavu:lang";
 
 type Outcome = "next" | "stop";
 
@@ -61,8 +61,8 @@ function canDo(flow: Flow): boolean {
   return flow.steps.some((s) => s.action || s.form);
 }
 
-export class Raahi {
-  private readonly opts: Required<Omit<RaahiOptions, "onEvent" | "navigate" | "ai" | "knowledge" | "speech">> & Pick<RaahiOptions, "onEvent" | "navigate" | "ai" | "knowledge" | "speech">;
+export class ChaloDikhavu {
+  private readonly opts: Required<Omit<ChaloDikhavuOptions, "onEvent" | "navigate" | "ai" | "knowledge" | "speech">> & Pick<ChaloDikhavuOptions, "onEvent" | "navigate" | "ai" | "knowledge" | "speech">;
   private overlay: Overlay | null = null;
   private readonly speaker: Speaker;
   private readonly listener: Listener;
@@ -76,7 +76,7 @@ export class Raahi {
   private cancelAutoListen: (() => void) | null = null;
   private readonly cleanup: Array<() => void> = [];
 
-  constructor(options: RaahiOptions) {
+  constructor(options: ChaloDikhavuOptions) {
     const language = options.language ?? "en";
     this.opts = {
       hotkey: " ",
@@ -132,7 +132,7 @@ export class Raahi {
    */
   start(flowId: string, mode?: RunMode): void {
     const flow = this.opts.flows.find((f) => f.id === flowId);
-    if (!flow) throw new Error(`raahi: no flow with id "${flowId}"`);
+    if (!flow) throw new Error(`chalo-dikhavu: no flow with id "${flowId}"`);
     void this.run(flow, 0, mode);
   }
 
@@ -423,7 +423,7 @@ export class Raahi {
       this.emit({ type: "explain", ...base, source: "ai" });
       return answer;
     } catch (err) {
-      if (!signal?.aborted) console.warn("raahi: AI answer failed", err);
+      if (!signal?.aborted) console.warn("chalo-dikhavu: AI answer failed", err);
       this.emit({ type: "explain", ...base, source: "error" });
       return ui(this.lang, "aiError");
     }
@@ -617,11 +617,11 @@ export class Raahi {
     );
   }
 
-  private emit(event: RaahiEvent): void {
+  private emit(event: ChaloDikhavuEvent): void {
     try {
       this.opts.onEvent?.(event);
     } catch (err) {
-      console.error("raahi: onEvent handler threw", err);
+      console.error("chalo-dikhavu: onEvent handler threw", err);
     }
   }
 
