@@ -10,6 +10,8 @@ export { questionFor } from "./prompts";
 export { parseAnswer } from "./answers";
 export type {
   Advance,
+  AiOptions,
+  ExplainRequest,
   FieldOptions,
   Flow,
   LocalizedText,

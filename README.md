@@ -140,26 +140,31 @@ Answers come from, in order:
 
 **What is sent to the AI:** the question, the page title and path, the current field's *label*, the labels of the other fields, and your knowledge text. **Never the values the user typed.** Your compliance team can review the `ExplainRequest` type for the complete list.
 
-### Option A: your own backend and your own Anthropic key
+### Option A: your own endpoint, any AI model
+
+`ai.endpoint` receives a `POST` with an `ExplainRequest` as JSON and must reply `{ "answer": "…" }`. Any non-2xx status, or no `answer`, makes Chalo Dikhavu tell the user politely that answers are unavailable. Keep answers to one to three plain sentences in the requested `lang`, because they are read aloud.
 
 ```ts
-// server (Node). npm install @anthropic-ai/sdk
-import http from "node:http";
-import { createExplainer, createNodeHandler } from "chalo-dikhavu/server";
+// Express, with whichever model you use. Keep your API key on the server.
+import type { ExplainRequest } from "chalo-dikhavu";
 
-const explain = createExplainer({ instructions: "You help customers of Example Bank." }); // reads ANTHROPIC_API_KEY
-http.createServer(createNodeHandler(explain, { allowOrigins: ["https://www.examplebank.in"] })).listen(8080);
+app.post("/api/explain", express.json(), async (req, res) => {
+  const q = req.body as ExplainRequest;
+  const answer = await yourModel(`Using only this background:\n${q.knowledge}\n\n` +
+    `Answer in ${q.lang}, in 1-3 short sentences, the question a user asked about "${q.field?.label ?? q.page.title}": ${q.question}`);
+  res.json({ answer });
+});
 ```
 
-The handler also works as Express middleware. By default it uses Claude Opus 5.5 at low effort, which suits short spoken answers. The fixed rules and your knowledge text are prompt-cached, so repeat questions cost much less. It also turns on Anthropic's server-side refusal fallback: if the model declines a question, it's retried on a fallback model automatically. The API key never reaches the browser.
+Or answer in the browser without HTTP: `ai: { answer: async (req) => "…" }`.
 
-### Option B: Chalo Dikhavu Cloud (hosted)
+### Option B: Chalo Dikhavu Cloud (hosted, coming soon)
 
 ```ts
 init({ flows, ai: { endpoint: "https://<chalo-dikhavu cloud>/v1/explain", projectKey: "cd_pub_…" } })
 ```
 
-The project key is public and only works from your allowed origins. Usage is metered in tokens, and each project gets a free allowance (`freeTokens`) before billing. The prototype server is in `cloud/` (`npm run cloud`; see `cloud/server.mjs`). It isn't hosted anywhere yet.
+The Cloud provides tuned, prompt-cached answers for Indian forms (KYC, PAN, Aadhaar and more) in Indian languages, without running a backend. Project keys are public and work only from your allowed origins. Each project gets a free allowance before billing. Self-hosted deployments for banks and other regulated companies are available on request.
 
 ## API
 
@@ -181,8 +186,7 @@ npm install
 npm test               # unit tests
 npm run build
 npm run playground     # demo SPA: http://localhost:4400/student and /bank (account-opening demo)
-npm run kyc            # realistic bank KYC demo: http://localhost:4500 (offline AI answers unless ANTHROPIC_API_KEY is set)
-npm run cloud          # Chalo Dikhavu Cloud prototype on :4600 (DIKHAVU_MOCK_AI=1 for no key); open http://localhost:4500/?cloud
+npm run kyc            # realistic bank KYC demo: http://localhost:4500 (offline demo answers)
 node test/e2e-kyc.mjs  # full KYC journey in real Chrome
 npm run e2e            # real-browser test against the playground (needs Chrome)
 ```

@@ -14,11 +14,6 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
-    },
-    "./server": {
-      "types": "./dist/server.d.ts",
-      "import": "./dist/server.js",
-      "require": "./dist/server.cjs"
     }
   },
   "files": [
@@ -37,8 +32,7 @@
     "playground": "node scripts/serve-playground.mjs",
     "e2e": "node test/e2e.mjs",
     "try": "npm run extension && node scripts/open-with-extension.mjs",
-    "kyc": "node scripts/serve-kyc.mjs",
-    "cloud": "node cloud/server.mjs"
+    "kyc": "node scripts/serve-kyc.mjs"
   },
   "keywords": [
     "product-tour",
@@ -53,7 +47,6 @@
     "accessibility"
   ],
   "devDependencies": {
-    "@anthropic-ai/sdk": "^0.131.0",
     "@types/node": "^22.20.5",
     "jsdom": "^30.1.1",
     "playwright-core": "^1.63.0",
@@ -61,13 +54,5 @@
     "typescript": "^5.9.3",
     "vitest": "^5.0.2"
   },
-  "author": "Jay Shah",
-  "peerDependencies": {
-    "@anthropic-ai/sdk": ">=0.131.0"
-  },
-  "peerDependenciesMeta": {
-    "@anthropic-ai/sdk": {
-      "optional": true
-    }
-  }
+  "author": "Jay Shah"
 }

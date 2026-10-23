@@ -148,7 +148,7 @@ export interface ExplainRequest {
 export interface AiOptions {
   /**
    * POST endpoint that takes an ExplainRequest and returns `{ answer }`.
-   * Either your own server (see `chalo-dikhavu/server`) or Chalo Dikhavu Cloud.
+   * Either your own server (any model; see the README) or Chalo Dikhavu Cloud.
    */
   endpoint?: string;
   /** Chalo Dikhavu Cloud project key (public, origin-restricted). Sent as a Bearer token. */

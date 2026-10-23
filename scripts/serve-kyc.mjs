@@ -1,29 +1,47 @@
 // Bharat Demo Bank KYC demo on http://localhost:4500, standing in for the bank's own server:
-// it serves the site and answers /api/explain with chalo-dikhavu/server ("bring your own key").
+// it serves the site and answers /api/explain with offline demo answers (no API key, no cost).
 //
-//   ANTHROPIC_API_KEY=... node scripts/serve-kyc.mjs     real answers from Claude
-//   node scripts/serve-kyc.mjs                           no key: offline demo answers, no cost
+//   node scripts/serve-kyc.mjs
+//
+// /api/explain shows the endpoint contract: POST an ExplainRequest, reply { answer }.
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
-import { createExplainer, createMockExplainer, createNodeHandler } from "../dist/server.js";
 
 const PORT = Number(process.env.PORT ?? 4500);
-const real = !!process.env.ANTHROPIC_API_KEY && !process.env.DIKHAVU_MOCK_AI;
-const explain = real
-  ? createExplainer({ instructions: "You are helping customers of Bharat Demo Bank complete their KYC." })
-  : createMockExplainer();
-const api = createNodeHandler(explain, {
-  onUsage: (u) => console.log(`[explain] ${u.totalTokens} tokens (in ${u.inputTokens}, out ${u.outputTokens}, cache read ${u.cacheReadTokens})`),
-});
 
 const files = {
   "/chalo-dikhavu.global.js": ["dist/chalo-dikhavu.global.js", "text/javascript"],
   "/kyc-flows.js": ["examples/bank-kyc/kyc-flows.js", "text/javascript"],
 };
 
+/** Offline stand-in for a real AI answer. Echoes the field so the plumbing is visible. */
+function demoAnswer(req) {
+  const about = req.field?.label ? `“${req.field.label}”` : req.flow?.title ? `“${req.flow.title}”` : "this page";
+  return req.lang === "hi"
+    ? `(डेमो उत्तर) आपने ${about} के बारे में पूछा। असली जवाबों के लिए अपना AI endpoint जोड़ें।`
+    : `(Demo answer) You asked about ${about}. Connect your own AI endpoint for real answers.`;
+}
+
+async function explain(req, res) {
+  if (req.method !== "POST") return res.writeHead(405).end();
+  let body = "";
+  for await (const chunk of req) {
+    body += chunk;
+    if (body.length > 64 * 1024) return res.writeHead(413).end();
+  }
+  let parsed;
+  try {
+    parsed = JSON.parse(body);
+  } catch {
+    return res.writeHead(400).end();
+  }
+  res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
+  res.end(JSON.stringify({ answer: demoAnswer(parsed ?? {}) }));
+}
+
 createServer(async (req, res) => {
   const path = new URL(req.url, "http://x").pathname;
-  if (path === "/api/explain") return api(req, res);
+  if (path === "/api/explain") return explain(req, res);
   const [file, type] = files[path] ?? ["examples/bank-kyc/index.html", "text/html; charset=utf-8"];
   try {
     res.writeHead(200, { "content-type": type });
@@ -33,5 +51,5 @@ createServer(async (req, res) => {
   }
 }).listen(PORT, () => {
   console.log(`Bharat Demo Bank (KYC demo): http://localhost:${PORT}`);
-  console.log(real ? "AI answers: Claude (ANTHROPIC_API_KEY)" : "AI answers: offline demo answers (set ANTHROPIC_API_KEY for real ones)");
+  console.log("AI answers: offline demo answers");
 });

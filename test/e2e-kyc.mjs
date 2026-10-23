@@ -11,7 +11,7 @@ const PORT = 4501;
 const BASE = `http://localhost:${PORT}`;
 const CHROME = process.env.CHROME ?? "C:/Program Files/Google/Chrome/Application/chrome.exe";
 
-const server = spawn(process.execPath, ["scripts/serve-kyc.mjs"], { env: { ...process.env, PORT: String(PORT), DIKHAVU_MOCK_AI: "1" }, stdio: "pipe" });
+const server = spawn(process.execPath, ["scripts/serve-kyc.mjs"], { env: { ...process.env, PORT: String(PORT) }, stdio: "pipe" });
 await new Promise((resolve, reject) => {
   server.stdout.on("data", (d) => String(d).includes("KYC demo") && resolve());
   server.on("exit", (code) => reject(new Error(`server exited ${code}`)));
