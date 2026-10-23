@@ -1,0 +1,7 @@
+node_modules/
+dist/
+dev-extension/chalo-dikhavu.global.js
+*.tgz
+dev-extension/flows.js
+test/e2e-fail-*.png
+test/e2e-kyc-fail-*.png
