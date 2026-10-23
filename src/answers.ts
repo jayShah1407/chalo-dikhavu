@@ -1,5 +1,7 @@
 import type { FieldInfo, FieldOption } from "./fields";
+import type { UiKey } from "./i18n";
 import { scoreText } from "./intent";
+import { asciiDigits, isNumberWord, spokenDigits, spokenNumber, wordValue } from "./numbers";
 import { hasIndicScript, romaniseName } from "./translit";
 
 /**
@@ -8,67 +10,77 @@ import { hasIndicScript, romaniseName } from "./translit";
  * "चौदह जुलाई 1998"; forms want "9825…", "jay.shah@gmail.com", "1998-07-14".
  */
 
-export type Parsed = { ok: true; value: string; display: string } | { ok: false };
+/** Why an answer didn't fit, so the guide can say something more useful than "say it again". */
+export type Hint = Extract<UiKey, `hint${string}`>;
+export type Parsed =
+  | { ok: true; value: string; display: string }
+  | { ok: false; why?: Hint; vars?: Record<string, string | number> };
 
-const DIGIT_WORDS: Record<string, string> = {
-  // Not "no", "to" or "for": "mobile no is…", "set it to…" would turn into digits.
-  zero: "0", oh: "0", one: "1", two: "2", three: "3", four: "4", five: "5",
-  six: "6", seven: "7", eight: "8", nine: "9",
-  // Hinglish
-  shunya: "0", ek: "1", do: "2", teen: "3", tin: "3", char: "4", chaar: "4", paanch: "5", panch: "5",
-  chhe: "6", che: "6", chah: "6", saat: "7", aath: "8", nau: "9",
-  // Hindi
-  "शून्य": "0", "एक": "1", "दो": "2", "तीन": "3", "चार": "4", "पाँच": "5", "पांच": "5",
-  "छह": "6", "छः": "6", "छे": "6", "सात": "7", "आठ": "8", "नौ": "9",
-  // Gujarati
-  "એક": "1", "બે": "2", "ત્રણ": "3", "ચાર": "4", "પાંચ": "5", "છ": "6", "સાત": "7", "આઠ": "8", "નવ": "9", "શૂન્ય": "0",
-};
-const REPEAT: Record<string, number> = { double: 2, triple: 3, "डबल": 2, "ट्रिपल": 3 };
+export { spokenDigits, spokenNumber };
 
-/** Devanagari/Gujarati digits → ASCII. */
-function asciiDigits(s: string): string {
-  return s
-    .replace(/[०-९]/g, (d) => String(d.charCodeAt(0) - 0x966))
-    .replace(/[૦-૯]/g, (d) => String(d.charCodeAt(0) - 0xae6));
-}
+const fail = (why?: Hint, vars?: Record<string, string | number>): Parsed => (why ? { ok: false, why, vars } : { ok: false });
 
-/** "nine eight double two 5 4" → "982254". Words that aren't digits are ignored. */
-export function spokenDigits(text: string): string {
-  let out = "";
-  let repeat = 1;
-  for (const raw of asciiDigits(text).toLowerCase().split(/[\s,.-]+/)) {
-    if (!raw) continue;
-    if (REPEAT[raw]) {
-      repeat = REPEAT[raw];
-      continue;
-    }
-    const d = /^\d+$/.test(raw) ? raw : DIGIT_WORDS[raw];
-    if (d) {
-      out += d.length === 1 ? d.repeat(repeat) : d;
-      repeat = 1;
-    }
-  }
-  return out;
-}
+/** Words for email symbols and common domains, as English or Hindi/Gujarati speech-to-text writes them. */
+const EMAIL_WORDS = new Map<string, string>(Object.entries({
+  at: "@", "एट": "@", "ऐट": "@", "એટ": "@",
+  dot: ".", period: ".", "डॉट": ".", "डोट": ".", "ડોટ": ".", "ડૉટ": ".",
+  underscore: "_", "अंडरस्कोर": "_", "અંડરસ્કોર": "_",
+  dash: "-", hyphen: "-", "डैश": "-", "हाइफ़न": "-", "हाइफन": "-",
+  "जीमेल": "gmail", "જીમેલ": "gmail", "याहू": "yahoo", "યાહૂ": "yahoo", "हॉटमेल": "hotmail", "આઉટલુક": "outlook",
+  "आउटलुक": "outlook", "रेडिफमेल": "rediffmail", "रेडिफ़मेल": "rediffmail", "आईक्लाउड": "icloud",
+  "कॉम": "com", "कोम": "com", "કોમ": "com", "કૉમ": "com", "इन": "in", "ઇન": "in", "નેટ": "net", "नेट": "net",
+  "ऑर्ग": "org", "को": "co", "કો": "co",
+  capital: "", small: "",
+}));
 
 export function parseEmail(text: string): Parsed {
-  const value = asciiDigits(text)
+  const tokens = asciiDigits(text)
     .toLowerCase()
-    .replace(/\b(at the rate( of)?|at)\b|एट द रेट|एट/g, "@")
-    .replace(/\b(dot|period)\b|डॉट/g, ".")
-    .replace(/\b(underscore)\b|अंडरस्कोर/g, "_")
-    .replace(/\b(dash|hyphen)\b/g, "-")
-    .replace(/\s+/g, "")
-    .replace(/\.$/, "");
-  return /^[^@\s]+@[^@\s]+\.[a-z]{2,}$/.test(value) ? { ok: true, value, display: value } : { ok: false };
+    .replace(/\bat the rate( of)?\b|एट द रेट( ऑफ़?)?|ऐट द रेट|એટ ધ રેટ/g, " @ ")
+    .split(/\s+/)
+    .filter(Boolean);
+  let out = "";
+  for (let i = 0; i < tokens.length; i++) {
+    const t = tokens[i];
+    const word = EMAIL_WORDS.get(t);
+    if (word !== undefined) {
+      out += word;
+      continue;
+    }
+    // "jay one four" → "jay14": two or more digit words in a row are digits, one alone may be a word.
+    if (isNumberWord(t) && !/^\d+$/.test(t)) {
+      let j = i;
+      while (j < tokens.length && isNumberWord(tokens[j])) j++;
+      const run = tokens.slice(i, j).join(" ");
+      if (j - i >= 2 || ((wordValue(t) ?? 99) < 10 && /\d$/.test(out))) {
+        out += spokenDigits(run);
+        i = j - 1;
+        continue;
+      }
+    }
+    // A Hindi/Gujarati-script word in the address: write it in English letters ("जय" → "jay").
+    out += hasIndicScript(t) ? romaniseName(t).toLowerCase() : t;
+  }
+  const value = out.replace(/\.$/, "");
+  return /^[a-z0-9._%+-]+@[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}$/.test(value) ? { ok: true, value, display: value } : fail("hintEmail");
 }
 
-export function parsePhone(text: string): Parsed {
+/**
+ * Indian mobile numbers have 10 digits after +91 or a leading 0; anything else is
+ * almost always a digit lost or doubled by speech-to-text, so ask again. Typed
+ * numbers are trusted more (landlines, short numbers). "+44 …" is kept as is.
+ */
+export function parsePhone(text: string, typed = false): Parsed {
+  const international = /^\s*(\+|plus\b)/i.test(text);
   let digits = spokenDigits(text.replace(/\+/g, " "));
+  if (international && !digits.startsWith("91") && digits.length >= 7 && digits.length <= 15) {
+    return { ok: true, value: `+${digits}`, display: `+${digits}` };
+  }
   if (digits.length === 12 && digits.startsWith("91")) digits = digits.slice(2);
   if (digits.length === 11 && digits.startsWith("0")) digits = digits.slice(1);
-  if (digits.length < 7 || digits.length > 13) return { ok: false };
-  return { ok: true, value: digits, display: digits.replace(/(\d{5})(\d+)/, "$1 $2") };
+  const fits = typed ? digits.length >= 6 && digits.length <= 15 : digits.length === 10;
+  if (!fits) return digits.length ? fail("hintPhone", { count: digits.length }) : fail();
+  return { ok: true, value: digits, display: digits.length === 10 ? digits.replace(/(\d{5})(\d+)/, "$1 $2") : digits };
 }
 
 const MONTHS: Array<string[]> = [
@@ -93,50 +105,113 @@ function monthOf(word: string): number {
   return i >= 0 ? i + 1 : 0;
 }
 
-/** "14 July 1998", "July 14th, 1998", "14/7/1998", "1998-07-14", "14 जुलाई 1998". Day-first, Indian style. */
-export function parseDate(text: string, iso: boolean): Parsed {
-  const t = asciiDigits(text).toLowerCase().replace(/(\d+)(st|nd|rd|th)\b/g, "$1").replace(/,/g, " ");
+const ORDINAL_WORDS = new Map<string, string>(Object.entries({
+  first: "one", second: "two", third: "three", fourth: "four", fifth: "five", sixth: "six", seventh: "seven",
+  eighth: "eight", ninth: "nine", tenth: "ten", eleventh: "eleven", twelfth: "twelve", thirteenth: "thirteen",
+  fourteenth: "fourteen", fifteenth: "fifteen", sixteenth: "sixteen", seventeenth: "seventeen",
+  eighteenth: "eighteen", nineteenth: "nineteen", twentieth: "twenty", thirtieth: "thirty",
+}));
+
+/**
+ * Number words → digits, run by run: "fourteenth of july nineteen ninety eight" →
+ * "14 of july 1998", "चौदह जुलाई उन्नीस सौ अट्ठानवे" → "14 जुलाई 1998".
+ */
+function numberWordsToDigits(text: string): string {
+  const raw = text.split(/\s+/).filter(Boolean);
+  const tokens = raw.map((w) => ORDINAL_WORDS.get(w) ?? w);
+  const out: string[] = [];
+  for (let i = 0; i < tokens.length; i++) {
+    // "may" is a month, not a number.
+    if (!isNumberWord(tokens[i]) || /^\d+$/.test(tokens[i]) || monthOf(tokens[i])) {
+      out.push(tokens[i]);
+      continue;
+    }
+    let j = i;
+    while (j < tokens.length && isNumberWord(tokens[j]) && !/^\d+$/.test(tokens[j]) && !monthOf(tokens[j])) {
+      // An ordinal ends the day: "twenty first | two thousand five".
+      if (ORDINAL_WORDS.has(raw[j++])) break;
+    }
+    const run = tokens.slice(i, j).join(" ");
+    const n = spokenNumber(run);
+    // "nineteen ninety eight" reads digit-by-pair (1998); "two thousand five" as a quantity (2005).
+    out.push(/hundred|thousand|sau|hazaa?r|सौ|हज़?ार|સો|હજાર/.test(run) ? String(n ?? "") : spokenDigits(run));
+    i = j - 1;
+  }
+  return out.join(" ");
+}
+
+/** "98" → 1998, "05" → 2005: two-digit years up to this year are this century. */
+function fullYear(y: number): number {
+  if (y >= 100) return y;
+  const now = new Date().getFullYear() % 100;
+  return y <= now ? 2000 + y : 1900 + y;
+}
+
+/** Field date formats like "DD-MM-YYYY", "YYYY/MM/DD", "MM/DD/YYYY". */
+function formatDate(format: string, d: number, m: number, y: number): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return format.replace(/YYYY|YY|MM|DD/g, (t) => (t === "YYYY" ? String(y) : t === "YY" ? pad(y % 100) : t === "MM" ? pad(m) : pad(d)));
+}
+
+/**
+ * "14 July 1998", "July 14th, 1998", "14/7/98", "fourteenth July nineteen ninety eight",
+ * "चौदह जुलाई 1998". Day-first, Indian style, unless the field's `format` says month-first.
+ * Output: ISO for date inputs, else the field's format, else dd/mm/yyyy.
+ */
+export function parseDate(text: string, iso: boolean, format?: string): Parsed {
+  const t = numberWordsToDigits(asciiDigits(text).toLowerCase().replace(/(\d+)(st|nd|rd|th)\b/g, "$1").replace(/,/g, " "));
+  const monthFirst = !!format && format.indexOf("MM") < format.indexOf("DD") && !format.startsWith("YY");
   let d = 0, m = 0, y = 0;
   let match: RegExpMatchArray | null;
   if ((match = t.match(/\b(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})\b/))) {
     [y, m, d] = [+match[1], +match[2], +match[3]];
-  } else if ((match = t.match(/\b(\d{1,2})[-/. ](\d{1,2})[-/. ](\d{4})\b/))) {
-    [d, m, y] = [+match[1], +match[2], +match[3]];
+  } else if ((match = t.match(/\b(\d{1,2})[-/. ](\d{1,2})[-/. ](\d{4}|\d{2})\b/))) {
+    [d, m, y] = monthFirst ? [+match[2], +match[1], fullYear(+match[3])] : [+match[1], +match[2], fullYear(+match[3])];
   } else {
     const words = t.split(/\s+/).filter(Boolean);
     const mi = words.findIndex((w) => monthOf(w));
     if (mi >= 0) {
       m = monthOf(words[mi]);
       const nums = words.filter((w) => /^\d+$/.test(w)).map(Number);
-      y = nums.find((n) => n > 31) ?? 0;
-      d = nums.find((n) => n >= 1 && n <= 31) ?? 0;
+      // "14 July 1998", "July 14 98", "1998 July 14": a number over 31 is the year, else the second one is.
+      const yi = nums.findIndex((n) => n > 31);
+      const yearIndex = yi >= 0 ? yi : nums.length >= 2 ? 1 : -1;
+      if (yearIndex >= 0) y = fullYear(nums[yearIndex]);
+      d = nums.find((n, i) => i !== yearIndex && n >= 1 && n <= 31) ?? 0;
     }
   }
   const date = new Date(Date.UTC(y, m - 1, d));
   const valid = y >= 1900 && y <= 2100 && date.getUTCMonth() === m - 1 && date.getUTCDate() === d;
-  if (!valid) return { ok: false };
-  const pad = (n: number) => String(n).padStart(2, "0");
+  if (!valid) return fail("hintDate");
   return {
     ok: true,
-    value: iso ? `${y}-${pad(m)}-${pad(d)}` : `${pad(d)}/${pad(m)}/${y}`,
+    value: iso ? formatDate("YYYY-MM-DD", d, m, y) : formatDate(format ?? "DD/MM/YYYY", d, m, y),
     display: `${d} ${MONTH_NAMES[m - 1]} ${y}`,
   };
 }
 
 // Whole words only: "ना" must not match inside "नाम", nor "मत" inside "मतलब".
 const YES = new Set([
-  "yes", "yeah", "yep", "yup", "yea", "correct", "right", "sure", "ok", "okay",
-  "haan", "haa", "ha", "han", "ji", "theek", "thik", "sahi",
-  "हाँ", "हां", "हा", "जी", "सही", "ठीक", "હા", "બરાબર",
+  "yes", "yeah", "yep", "yup", "yea", "correct", "right", "sure", "ok", "okay", "absolutely", "exactly",
+  "perfect", "definitely", "haan", "haa", "ha", "han", "haanji", "hanji", "ji", "theek", "thik", "sahi", "bilkul",
+  "barabar", "हाँ", "हां", "हा", "हांजी", "जी", "सही", "ठीक", "बिल्कुल", "बिलकुल", "હા", "હાજી", "બરાબર", "સાચું", "સાચુ",
 ]);
 const NO = new Set([
-  "no", "nope", "nah", "not", "wrong", "nahi", "nahin", "na", "galat", "mat",
-  "नहीं", "नही", "ना", "गलत", "ग़लत", "मत", "ના", "નહીં", "નહિ", "ખોટું",
+  "no", "nope", "nah", "not", "wrong", "incorrect", "nahi", "nahin", "nai", "na", "galat", "mat",
+  "नहीं", "नही", "ना", "गलत", "ग़लत", "मत", "ના", "નહીં", "નહિ", "ખોટું", "ખોટુ",
 ]);
+/** Phrases whose words say "no" but mean yes. */
+const MEANS_YES = /\b(no problem|no issues?|not wrong|nothing wrong|galat nahi|of course)\b|ग़?गलत नहीं|ખોટું નથી/g;
+/** "Not sure", "pata nahi": neither answer. */
+const UNSURE = /\b(not sure|don'?t know|do not know|pata nahi|maybe|may be)\b|पता नहीं|मालूम नहीं|ખબર નથી/;
 
 /** true / false / null (couldn't tell). "No" wins over "yes" in "no, that's not right". */
 export function parseYesNo(text: string): boolean | null {
-  const words = text.toLowerCase().split(/[^\p{L}\p{M}]+/u).filter(Boolean);
+  const t = text.toLowerCase();
+  if (UNSURE.test(t)) return null;
+  const words = t.replace(MEANS_YES, " yes ").split(/[^\p{L}\p{M}']+/u).filter(Boolean);
+  // "sahi hai na?" and "haan na": a trailing "na" asks for agreement, it doesn't say no.
+  if (words.length > 1 && (words[words.length - 1] === "na" || words[words.length - 1] === "ना") && words.some((w) => YES.has(w))) words.pop();
   if (words.some((w) => NO.has(w))) return false;
   if (words.some((w) => YES.has(w))) return true;
   return null;
@@ -170,21 +245,118 @@ export function parseChoice(text: string, options: FieldOption[]): Parsed {
   return pick ? { ok: true, value: pick.value, display: pick.label } : { ok: false };
 }
 
+/** Letter names as Hindi/Gujarati speech-to-text writes them: "एसबीआई" = S B I. */
+const INDIC_LETTERS: Array<[string, string]> = ([
+  ["डब्ल्यू", "W"], ["डबल्यू", "W"], ["क्यू", "Q"], ["एक्स", "X"], ["ज़ेड", "Z"], ["जेड", "Z"], ["ज़ेड", "Z"], ["वाई", "Y"],
+  ["एफ", "F"], ["एफ़", "F"], ["एच", "H"], ["आई", "I"], ["जे", "J"], ["के", "K"], ["एल", "L"], ["एम", "M"], ["एन", "N"],
+  ["पी", "P"], ["आर", "R"], ["एस", "S"], ["टी", "T"], ["यू", "U"], ["वी", "V"], ["बी", "B"], ["सी", "C"], ["डी", "D"],
+  ["जी", "G"], ["ओ", "O"], ["ए", "A"], ["ई", "E"],
+  ["એ", "A"], ["બી", "B"], ["સી", "C"], ["ડી", "D"], ["ઈ", "E"], ["એફ", "F"], ["જી", "G"], ["એચ", "H"], ["આઈ", "I"],
+  ["જે", "J"], ["કે", "K"], ["એલ", "L"], ["એમ", "M"], ["એન", "N"], ["ઓ", "O"], ["પી", "P"], ["ક્યૂ", "Q"], ["આર", "R"],
+  ["એસ", "S"], ["ટી", "T"], ["યુ", "U"], ["વી", "V"], ["એક્સ", "X"], ["વાય", "Y"], ["ઝેડ", "Z"],
+] as Array<[string, string]>).sort((a, b) => b[0].length - a[0].length);
+
+function indicLetters(word: string): string | null {
+  let out = "";
+  for (let rest = word; rest; ) {
+    const hit = INDIC_LETTERS.find(([name]) => rest.startsWith(name));
+    if (!hit) return null;
+    out += hit[1];
+    rest = rest.slice(hit[0].length);
+  }
+  return out;
+}
+
+/** Words around a spelled-out code that aren't part of it. */
+const CODE_FILLER = new Set([
+  "is", "the", "my", "it", "its", "code", "number", "no", "and", "please", "id", "hai", "mera", "meri", "ka", "ki",
+  "capital", "small", "letter", "then", "space", "dash", "hyphen", "slash", "है", "मेरा", "मेरी", "का", "की", "છે",
+  "pan", "ifsc", "card", "gst", "gstin", "account", "passport", "voter", "पैन", "कोड", "नंबर",
+]);
+
+/**
+ * A spelled-out code: "s b i n zero zero zero one two three four" → "SBIN0001234".
+ * Understands "S for Sugar" / "S as in Sugar", "double zero", digit words in any of
+ * the four languages, and Hindi-script letter names ("एस बी आई").
+ */
+export function spokenCode(text: string): string {
+  const tokens = asciiDigits(text).replace(/[,.;:/]/g, " ").split(/\s+/).filter(Boolean);
+  let out = "";
+  let repeat = 1;
+  for (let i = 0; i < tokens.length; i++) {
+    const t = tokens[i];
+    const lower = t.toLowerCase();
+    // "S for Sugar", "S as in Sugar", "S से Sugar": keep the letter, drop the example word.
+    const next = tokens[i + 1]?.toLowerCase();
+    if (/^[a-z]$/i.test(t) && (next === "for" || next === "से" || (next === "as" && tokens[i + 2]?.toLowerCase() === "in"))) {
+      out += t.toUpperCase().repeat(repeat);
+      repeat = 1;
+      i += next === "as" ? 3 : 2;
+      continue;
+    }
+    if (lower === "double" || lower === "triple" || t === "डबल" || t === "ट्रिपल") {
+      repeat = lower === "triple" || t === "ट्रिपल" ? 3 : 2;
+      continue;
+    }
+    if (CODE_FILLER.has(lower)) continue;
+    if (/^[a-z0-9]+$/i.test(t)) {
+      if (t.length > 1 && /^[a-z]+$/i.test(t) && wordValue(lower) !== undefined) out += spokenDigits(lower).repeat(repeat);
+      else out += (t.length === 1 ? t.repeat(repeat) : t).toUpperCase();
+      repeat = 1;
+      continue;
+    }
+    const value = wordValue(t);
+    if (value !== undefined) {
+      out += spokenDigits(t).repeat(value < 10 ? repeat : 1);
+      repeat = 1;
+      continue;
+    }
+    const letters = indicLetters(t);
+    if (letters) {
+      out += letters.length === 1 ? letters.repeat(repeat) : letters;
+      repeat = 1;
+    }
+  }
+  return out;
+}
+
+/** PAN: 5 letters, 4 digits, 1 letter. Fix the O/0 mix-ups speech makes in the wrong places. */
+function parsePan(raw: string): Parsed {
+  const code = spokenCode(raw);
+  if (code.length !== 10) return fail("hintPan");
+  const pan = code
+    .split("")
+    .map((c, i) => (i >= 5 && i <= 8 ? c.replace("O", "0") : c.replace("0", "O")))
+    .join("");
+  return /^[A-Z]{5}\d{4}[A-Z]$/.test(pan) ? { ok: true, value: pan, display: pan.split("").join(" ") } : fail("hintPan");
+}
+
+/** IFSC: 4 letters, a zero, then 6 letters or digits (SBIN0001234). */
+function parseIfsc(raw: string): Parsed {
+  const code = spokenCode(raw);
+  const ifsc = code.length === 11 ? code.slice(0, 4).replace(/0/g, "O") + code[4].replace("O", "0") + code.slice(5) : code;
+  return /^[A-Z]{4}0[A-Z0-9]{6}$/.test(ifsc) ? { ok: true, value: ifsc, display: ifsc } : fail("hintIfsc");
+}
+
 function titleCase(s: string): string {
   return s.replace(/\S+/g, (w) => (/^[a-z]/.test(w) ? w[0].toUpperCase() + w.slice(1) : w));
 }
 
-// "my name is …", "my mobile number is …", "it's …", "I am …"
-const LEAD_EN = /^(?:(?:my|the)\s+(?:[\p{L}'’]+\s+){1,3}?(?:is|was|are)|it'?s|it is|this is|i am|i'm|its)\s+/iu;
+// "my name is …", "my mobile number is …", "it's …", "I am …", "myself …"
+const LEAD_EN = /^(?:(?:my|the)\s+(?:[\p{L}'’]+\s+){1,3}?(?:is|was|are)|it'?s|it is|this is|i am|i'm|its|myself|call me)\s+/iu;
 // "mera naam …", "mere papa ka naam …", "मेरा नाम …", "મારું નામ …"
 const LEAD_HI =
   /^(?:mera|meri|mere|मेरा|मेरी|मेरे|મારું|મારો|મારી|મારા)\s+(?:(?:naam|name|number|nambar|no|mobile|phone|email|id|pata|address|pin|pincode|code|janam|janm|tithi|date|birth|pan|card|papa|pitaji|pita|father|husband|pati|wife|patni|ka|ki|ke|नाम|नंबर|मोबाइल|फ़ोन|फोन|ईमेल|पता|पिन|कोड|जन्म|तिथि|तारीख|पैन|कार्ड|पिता|पिताजी|पापा|पति|पत्नी|का|की|के|નામ|નંબર|મોબાઇલ|સરનામું|પિતા|પતિ|નો|ની|નું)\s+){1,4}/iu;
+// "naam Jay Shah hai", "नाम जय शाह है": the noun without "my"
+const LEAD_NOUN = /^(?:naam|नाम|નામ)\s+/iu;
+// "mera naam hai Jay": a "hai" right after the lead-in
+const LEAD_HAI = /^(?:hai|है|છે)\s+/iu;
 // "… hai", "… है", "… છે"
 const TRAIL = /\s+(?:hai|he|hain|है|हैं|chhe|che|છે)$/iu;
 
 /** Remove lead-ins people naturally say around an answer: "my name is Jay Shah" → "Jay Shah". */
 export function stripLeadIn(text: string): string {
-  const cut = text.replace(LEAD_EN, "").replace(LEAD_HI, "").replace(TRAIL, "").trim();
+  const cut = text.replace(LEAD_EN, "").replace(LEAD_HI, "").replace(LEAD_NOUN, "").replace(LEAD_HAI, "").replace(TRAIL, "").trim();
   return cut || text;
 }
 
@@ -200,8 +372,55 @@ export function plausibleName(name: string): boolean {
   return parseYesNo(name) === null; // "yes", "haan", "no" are answers to a different question
 }
 
+/** Compile a field's `pattern` attribute the way the browser does (whole value, `v` flag). */
+function patternOf(pattern: string): RegExp | null {
+  for (const flags of ["v", "u"]) {
+    try {
+      return new RegExp(`^(?:${pattern})$`, flags);
+    } catch {
+      // Older browsers don't know "v"; some patterns are invalid under it. Try the next.
+    }
+  }
+  return null;
+}
+
+/**
+ * Check a parsed value against the field's own rules (maxlength, minlength,
+ * pattern, min, max), so a value the site would reject is caught before it's typed.
+ */
+export function checkConstraints(info: FieldInfo, parsed: Parsed): Parsed {
+  const el = info.el as HTMLInputElement | undefined;
+  if (!parsed.ok || !el || info.kind === "choice" || info.kind === "check" || !("value" in el)) return parsed;
+  const v = parsed.value;
+  if (el.maxLength > 0 && v.length > el.maxLength) return fail("hintTooLong", { max: el.maxLength, count: v.length });
+  if (el.minLength > 0 && v.length < el.minLength) return fail("hintTooShort", { min: el.minLength });
+  const pattern = el.getAttribute("pattern");
+  if (pattern && !patternOf(pattern)?.test(v)) return fail("hintFormat");
+  const type = (el.getAttribute("type") ?? "").toLowerCase();
+  const min = el.getAttribute("min");
+  const max = el.getAttribute("max");
+  if (type === "number") {
+    if (min !== null && min !== "" && Number(v) < Number(min)) return fail("hintMin", { min });
+    if (max !== null && max !== "" && Number(v) > Number(max)) return fail("hintMax", { max });
+  }
+  if (type === "date") {
+    // ISO dates compare correctly as strings; say them the way people do.
+    const say = (iso: string) => {
+      const d = parseDate(iso, true);
+      return d.ok ? d.display : iso;
+    };
+    if (min && v < min) return fail("hintMin", { min: say(min) });
+    if (max && v > max) return fail("hintMax", { max: say(max) });
+  }
+  return parsed;
+}
+
 /** Parse an answer for a field. Typed answers are trusted more: they skip speech fixes. */
 export function parseAnswer(info: FieldInfo, text: string, typed = false): Parsed {
+  return checkConstraints(info, parseValue(info, text, typed));
+}
+
+function parseValue(info: FieldInfo, text: string, typed: boolean): Parsed {
   let raw = text.trim().replace(/[.!?।]+$/, "");
   if (!typed) raw = stripLeadIn(raw);
   if (!raw) return { ok: false };
@@ -209,23 +428,28 @@ export function parseAnswer(info: FieldInfo, text: string, typed = false): Parse
     case "email":
       return typed && /^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(raw) ? { ok: true, value: raw, display: raw } : parseEmail(raw);
     case "phone":
-      return parsePhone(raw);
+      return parsePhone(raw, typed);
     case "pincode": {
       const pin = spokenDigits(raw);
-      return pin.length === 6 ? { ok: true, value: pin, display: pin.split("").join(" ") } : { ok: false };
+      if (pin.length !== 6) return pin.length ? fail("hintPin", { count: pin.length }) : fail();
+      return { ok: true, value: pin, display: pin.split("").join(" ") };
     }
     case "number": {
-      const n = asciiDigits(raw).replace(/[, ]/g, "");
-      if (/^-?\d+(\.\d+)?$/.test(n)) return { ok: true, value: n, display: n };
-      const d = spokenDigits(raw);
-      return d ? { ok: true, value: d, display: d } : { ok: false };
+      const plain = asciiDigits(raw).replace(/[, ]/g, "");
+      if (/^-?\d+(\.\d+)?$/.test(plain)) return { ok: true, value: plain, display: plain };
+      const n = spokenNumber(raw);
+      return n === null ? fail() : { ok: true, value: String(n), display: n.toLocaleString("en-IN") };
     }
     case "date":
-      return parseDate(raw, info.isoDate);
-    case "pan": {
-      // Speech tends to split letters: "a b c p e 1 2 3 4 f".
-      const pan = asciiDigits(raw).toUpperCase().replace(/[^A-Z0-9]/g, "");
-      return /^[A-Z]{5}\d{4}[A-Z]$/.test(pan) ? { ok: true, value: pan, display: pan.split("").join(" ") } : { ok: false };
+      return parseDate(raw, info.isoDate, info.dateFormat);
+    case "pan":
+      return parsePan(raw);
+    case "ifsc":
+      return parseIfsc(raw);
+    case "code": {
+      if (typed) return { ok: true, value: raw.trim(), display: raw.trim() };
+      const code = spokenCode(raw);
+      return code.length >= 2 ? { ok: true, value: code, display: code } : fail("hintFormat");
     }
     case "choice":
       return parseChoice(raw, info.options);
@@ -237,7 +461,7 @@ export function parseAnswer(info: FieldInfo, text: string, typed = false): Parse
       let name = typed ? raw : titleCase(raw);
       // Said in Hindi/Gujarati script, but the form is in English (e.g. name as on PAN).
       if (hasIndicScript(name) && !hasIndicScript(info.label) && /[A-Za-z]/.test(info.label)) name = romaniseName(name);
-      if (!plausibleName(name)) return { ok: false };
+      if (!plausibleName(name)) return fail("hintName");
       return { ok: true, value: name, display: name };
     }
     default:

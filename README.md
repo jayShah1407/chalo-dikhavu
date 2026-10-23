@@ -7,7 +7,7 @@
 - 🗣️ **Ask by voice or text.** Hold <kbd>Space</kbd> and say "teacher kaise dhunde", or type "how do I book a class". Chalo Dikhavu picks the right guide.
 - 🇮🇳 **India-first languages.** Works with English, Hindi and Hinglish out of the box, and the UI is also translated into Gujarati. Any language works for your own step text and recordings.
 - 🎙️ **Human voice.** Attach your own recordings per step and per language. Browser text-to-speech is the fallback.
-- 🔒 **Self-hosted, no backend.** Zero dependencies, about 19 KB gzipped, and nothing leaves the browser except the browser's own speech recognition.
+- 🔒 **Self-hosted, no backend.** Zero dependencies, about 30 KB gzipped, and nothing leaves the browser except the browser's own speech recognition.
 - 🛠️ **Hard to break.** Targets can use CSS, visible text or aria labels, with fallbacks. It re-finds elements after React re-renders and resumes after page reloads.
 
 ## Install
@@ -93,14 +93,19 @@ When the flow starts, the user picks **Do it with me** or **Just show me**. Chal
 | Field | Chalo Dikhavu asks | Understands answers like |
 |---|---|---|
 | `<label>Full name</label><input>` | "What's your full name?" | "jay shah" → `Jay Shah` |
-| `type="tel"`, or a label like "Mobile" | "What's your mobile number?" | "nine eight double two…", "नौ आठ…", "+91 98…" |
-| `type="email"` | "What's your email?" | "jay dot shah at gmail dot com" |
-| `type="date"`, or "Date of birth" | "What's your date of birth?" | "14 July 1998", "14/07/1998", "14 जुलाई 1998" |
-| "PAN" | "What's your PAN?" | "a b c d e 1 2 3 4 f" → `ABCDE1234F` |
+| `type="tel"`, or a label like "Mobile" | "What's your mobile number?" | "nine eight double two…", "ninety eight twenty five…", "नौ आठ…", "+91 98…" |
+| `type="email"` | "What's your email?" | "jay dot shah at gmail dot com", "जय एट जीमेल डॉट कॉम" |
+| `type="date"`, "Date of birth", or a `DD-MM-YYYY` placeholder | "What's your date of birth?" | "14 July 1998", "fourteenth July nineteen ninety eight", "14/07/98", "चौदह जुलाई 1998" (written in the field's own format) |
+| `type="number"`, e.g. "Annual income" | "What's your annual income?" | "two lakh fifty thousand", "saadhe teen lakh", "₹2,50,000" |
+| "PAN" | "What's your PAN?" | "a b c d e 1 2 3 4 f", "A for apple…" → `ABCDE1234F` |
+| "IFSC" | "What's your IFSC?" | "s b i n zero zero zero one two three four", "एसबीआईएन…" → `SBIN0001234` |
+| "Account number", "GSTIN", "Passport", "Vehicle"… | "What's your account number?" | spelled-out letters and digits → `GJ01AB1234` |
 | `<select>` / radio group | "Which account type? You can say: Savings, Current." | "savings", "the second one", "दूसरा" |
-| checkbox | "Should I tick “I agree to the terms”?" | "yes", "haan", "नहीं" |
+| checkbox | "Should I tick “I agree to the terms”?" | "yes", "haan", "sahi hai na", "no problem", "नहीं" |
 
 Every spoken answer is read back for confirmation ("I heard: 98250 12345. Is that right?"). Typed answers go straight in. Values are filled the way a real user would type them, so React, Vue and Angular forms see them.
+
+Answers are checked before they're typed in. A mobile number with a digit missing, a PAN of the wrong shape, or a value that breaks the field's own `maxlength`, `pattern`, `min` or `max` is not filled. Chalo Dikhavu says what was wrong ("A mobile number has 10 digits. I heard 9.") and asks again. After filling, if the site's own validation marks the field invalid, Chalo Dikhavu reads out the site's error message and asks again.
 
 **Safety rules (always on):**
 - **Passwords, OTPs, PINs, CVV, card and Aadhaar numbers are never listened to or filled.** Chalo Dikhavu points at the field and asks the user to type it themselves. Detection uses `type`, `autocomplete` and labels. Mark any other field with `sensitive: true`.

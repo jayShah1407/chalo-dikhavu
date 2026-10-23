@@ -29,7 +29,7 @@ describe("email", () => {
   it("understands spoken emails", () => {
     expect(parseEmail("jay dot shah at gmail dot com")).toMatchObject({ value: "jay.shah@gmail.com" });
     expect(parseEmail("jay underscore 14 at the rate yahoo dot in")).toMatchObject({ value: "jay_14@yahoo.in" });
-    expect(parseEmail("जय एट जीमेल डॉट कॉम").ok).toBe(false); // non-Latin local part isn't a valid email
+    expect(parseEmail("जय एट जीमेल डॉट कॉम")).toMatchObject({ value: "jay@gmail.com" }); // Hindi speech-to-text
     expect(parseEmail("not an email").ok).toBe(false);
   });
 });

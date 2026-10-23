@@ -40,7 +40,7 @@ export const LANGUAGE_NAMES: Record<string, string> = {
   ur: "اردو",
 };
 
-type UiKey =
+export type UiKey =
   | "help"
   | "askPlaceholder"
   | "holdToTalk"
@@ -88,7 +88,20 @@ type UiKey =
   | "micUnavailable"
   | "sayYesNo"
   | "fixBelow"
-  | "uploadYourself";
+  | "uploadYourself"
+  | "hintPhone"
+  | "hintPin"
+  | "hintPan"
+  | "hintIfsc"
+  | "hintDate"
+  | "hintEmail"
+  | "hintName"
+  | "hintTooLong"
+  | "hintTooShort"
+  | "hintFormat"
+  | "hintMin"
+  | "hintMax"
+  | "siteInvalid";
 
 const UI: Record<string, Record<UiKey, string>> = {
   en: {
@@ -140,6 +153,19 @@ const UI: Record<string, Record<UiKey, string>> = {
     sayYesNo: "Please say yes or no, or tap a button.",
     fixBelow: "Not quite? Fix it in the box below, or just say it again.",
     uploadYourself: "Please upload “{label}” yourself, then press Next.",
+    hintPhone: "A mobile number has 10 digits. I heard {count}.",
+    hintPin: "A PIN code has 6 digits. I heard {count}.",
+    hintPan: "A PAN has 10 characters, like ABCDE1234F.",
+    hintIfsc: "An IFSC has 11 characters, like SBIN0001234.",
+    hintDate: "Please say the date like: 14 July 1998.",
+    hintEmail: "Please say it like: name at gmail dot com.",
+    hintName: "I couldn't catch the name. Please say it again slowly, or type it.",
+    hintTooLong: "This box takes at most {max} characters. I heard {count}.",
+    hintTooShort: "This box needs at least {min} characters.",
+    hintFormat: "That doesn't look right for this box. Please check and say it again, or type it.",
+    hintMin: "It must be at least {min}.",
+    hintMax: "It can be at most {max}.",
+    siteInvalid: "The form didn't accept that: {message}",
   },
   hi: {
     help: "मदद चाहिए?",
@@ -190,6 +216,19 @@ const UI: Record<string, Record<UiKey, string>> = {
     sayYesNo: "कृपया हाँ या नहीं बोलें, या बटन दबाएँ।",
     fixBelow: "सही नहीं है? नीचे बॉक्स में ठीक करें, या फिर से बोलें।",
     uploadYourself: "कृपया “{label}” खुद अपलोड करें, फिर “आगे” दबाएँ।",
+    hintPhone: "मोबाइल नंबर में 10 अंक होते हैं। मैंने {count} सुने।",
+    hintPin: "पिन कोड में 6 अंक होते हैं। मैंने {count} सुने।",
+    hintPan: "PAN में 10 अक्षर होते हैं, जैसे ABCDE1234F।",
+    hintIfsc: "IFSC में 11 अक्षर होते हैं, जैसे SBIN0001234।",
+    hintDate: "कृपया तारीख ऐसे बोलें: 14 जुलाई 1998।",
+    hintEmail: "कृपया ऐसे बोलें: name एट gmail डॉट com।",
+    hintName: "मैं नाम समझ नहीं पाया। धीरे-धीरे फिर से बोलें, या लिखें।",
+    hintTooLong: "इस बॉक्स में ज़्यादा से ज़्यादा {max} अक्षर आते हैं। मैंने {count} सुने।",
+    hintTooShort: "इस बॉक्स में कम से कम {min} अक्षर चाहिए।",
+    hintFormat: "यह इस बॉक्स के लिए सही नहीं लग रहा। जाँचकर फिर से बोलें, या लिखें।",
+    hintMin: "यह कम से कम {min} होना चाहिए।",
+    hintMax: "यह ज़्यादा से ज़्यादा {max} हो सकता है।",
+    siteInvalid: "फ़ॉर्म ने इसे स्वीकार नहीं किया: {message}",
   },
   gu: {
     help: "મદદ જોઈએ?",
@@ -240,6 +279,19 @@ const UI: Record<string, Record<UiKey, string>> = {
     sayYesNo: "કૃપા કરીને હા કે ના બોલો, અથવા બટન દબાવો.",
     fixBelow: "બરાબર નથી? નીચેના બોક્સમાં સુધારો, અથવા ફરી બોલો.",
     uploadYourself: "કૃપા કરીને “{label}” જાતે અપલોડ કરો, પછી “આગળ” દબાવો.",
+    hintPhone: "મોબાઇલ નંબરમાં 10 આંકડા હોય છે. મેં {count} સાંભળ્યા.",
+    hintPin: "પિન કોડમાં 6 આંકડા હોય છે. મેં {count} સાંભળ્યા.",
+    hintPan: "PAN માં 10 અક્ષર હોય છે, જેમ કે ABCDE1234F.",
+    hintIfsc: "IFSC માં 11 અક્ષર હોય છે, જેમ કે SBIN0001234.",
+    hintDate: "કૃપા કરીને તારીખ આ રીતે બોલો: 14 જુલાઈ 1998.",
+    hintEmail: "કૃપા કરીને આ રીતે બોલો: name એટ gmail ડોટ com.",
+    hintName: "હું નામ સમજી શક્યો નહીં. ધીમે ધીમે ફરી બોલો, અથવા લખો.",
+    hintTooLong: "આ બોક્સમાં વધુમાં વધુ {max} અક્ષર આવે. મેં {count} સાંભળ્યા.",
+    hintTooShort: "આ બોક્સમાં ઓછામાં ઓછા {min} અક્ષર જોઈએ.",
+    hintFormat: "આ બોક્સ માટે આ બરાબર લાગતું નથી. તપાસીને ફરી બોલો, અથવા લખો.",
+    hintMin: "તે ઓછામાં ઓછું {min} હોવું જોઈએ.",
+    hintMax: "તે વધુમાં વધુ {max} હોઈ શકે.",
+    siteInvalid: "ફોર્મે આ સ્વીકાર્યું નહીં: {message}",
   },
 };
 

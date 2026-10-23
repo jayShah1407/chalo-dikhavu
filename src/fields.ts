@@ -12,6 +12,9 @@ export type FieldKind =
   | "number"
   | "date"
   | "pan"
+  | "ifsc"
+  /** Spelled-out IDs: GSTIN, passport, voter ID, account and policy numbers. */
+  | "code"
   | "pincode"
   | "choice"
   | "check"
@@ -36,6 +39,18 @@ export interface FieldInfo {
   options: FieldOption[];
   /** Date inputs want ISO; text boxes labelled "Date of birth" want dd/mm/yyyy. */
   isoDate: boolean;
+  /** The format a date text box asks for in its placeholder or label, e.g. "DD-MM-YYYY". */
+  dateFormat?: string;
+}
+
+/** "DD/MM/YYYY", "dd-mm-yyyy", "YYYY.MM.DD", "MM/DD/YY" in a placeholder or label. */
+function dateFormatIn(text: string): string | undefined {
+  const m = text.match(/\b(DD|MM|YYYY|YY)([/.\- ])(DD|MM)\2(YYYY|YY|DD)\b/i);
+  if (!m) return undefined;
+  const parts = [m[1], m[3], m[4]].map((p) => p.toUpperCase());
+  // Must name a day, a month and a year once each.
+  const ok = parts.includes("DD") && parts.includes("MM") && parts.some((p) => p.startsWith("YY"));
+  return ok ? parts.join(m[2]) : undefined;
 }
 
 const clean = (s: string | null | undefined) =>
@@ -111,6 +126,8 @@ const SENSITIVE_AUTOCOMPLETE = new Set([
   "current-password", "new-password", "one-time-code", "cc-number", "cc-csc", "cc-exp", "cc-exp-month", "cc-exp-year",
 ]);
 const SENSITIVE_HINT = /(password|passcode|pass code|\botp\b|one.?time|\bm?pin\b(?!\s*code)|\btpin\b|\bcvv\b|\bcvc\b|card\s*(number|no)|aadha?a?r|\bssn\b|security code)/i;
+const CODE_HINT =
+  /(gstin|\bgst\b|passport|voter|\bepic\b|driving licen[cs]e|\bdl\b|vehicle|registration (number|no)|account (number|no)|a\/c|customer id|policy (number|no)|roll (number|no)|application (number|no)|reference (number|no)|\buan\b|\btan\b|\bcin\b)/;
 const MANUAL_TYPES = new Set(["datetime-local", "time", "month", "week", "file", "range", "color"]);
 
 export function describeField(input: Element): FieldInfo {
@@ -145,6 +162,7 @@ export function describeField(input: Element): FieldInfo {
   else if (type === "date") kind = "date";
 
   const hints = `${el.name ?? ""} ${el.id} ${autocomplete} ${label}`.toLowerCase();
+  const dateFormat = dateFormatIn(`${el.getAttribute("placeholder") ?? ""} ${label} ${el.getAttribute("title") ?? ""}`);
   // The browser's autocomplete hint is the most reliable signal, so it wins over
   // label words: "Full name (as on PAN card)" is a name, not a PAN.
   const AUTOCOMPLETE_KIND: Record<string, FieldKind> = {
@@ -158,7 +176,10 @@ export function describeField(input: Element): FieldInfo {
     else if (/(pin\s*code|postal|\bzip\b)/.test(hints)) kind = "pincode";
     else if (/(full name|first name|last name|middle name|surname|father|spouse|mother)/.test(hints)) kind = "name";
     else if (/(\bpan\b|pan card|pan number|pan no)/.test(hints)) kind = "pan";
-    else if (/(date of birth|\bdob\b|birth\s*date|bday)/.test(hints)) kind = "date";
+    else if (/(date of birth|\bdob\b|birth\s*date|bday)/.test(hints) || dateFormat) kind = "date";
+    else if (/\bifsc\b/.test(hints)) kind = "ifsc";
+    // "Name as per passport" is a name, not a passport number.
+    else if (!/\bname\b/.test(hints) && CODE_HINT.test(hints)) kind = "code";
     else if (/^(name|given-name|family-name|additional-name)$/.test(autocomplete) || /(full name|first name|last name|middle name|surname|\bname\b)/.test(hints)) {
       kind = "name";
     }
@@ -168,7 +189,8 @@ export function describeField(input: Element): FieldInfo {
   const sensitive =
     type === "password" ||
     SENSITIVE_AUTOCOMPLETE.has(autocomplete) ||
-    (kind !== "pincode" && SENSITIVE_HINT.test(hints));
+    // "PIN code" isn't a PIN, and "PAN card number" isn't a payment card.
+    (kind !== "pincode" && kind !== "pan" && SENSITIVE_HINT.test(hints));
 
   return {
     el,
@@ -179,6 +201,7 @@ export function describeField(input: Element): FieldInfo {
     required: el.required || el.getAttribute("aria-required") === "true",
     options,
     isoDate: type === "date",
+    dateFormat: kind === "date" && type !== "date" ? dateFormat : undefined,
   };
 }
 

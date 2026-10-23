@@ -107,7 +107,7 @@ const sayWhenListening = async (what) => {
 await check("name heard as 'G' (real report): not accepted, asked again", async () => {
   await expectBubble("What's your full name (as on PAN card)?");
   await sayWhenListening("G");
-  await expectBubble("Sorry, I didn't catch that", 8000);
+  await expectBubble("I couldn't catch the name. Please say it again slowly, or type it.", 8000);
 });
 
 await check("name: the recognizer's second guess is used when the first makes no sense", async () => {

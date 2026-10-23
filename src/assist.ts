@@ -104,11 +104,32 @@ function inputTypeFor(info: FieldInfo): string {
  * fit the field: "G" is no name, but the second guess "Jay" is.
  */
 function parseBest(info: FieldInfo, answer: Answer): Parsed {
+  let first: Parsed | undefined;
   for (const candidate of [answer.text, ...(answer.alternatives ?? [])]) {
     const parsed = parseAnswer(info, candidate, answer.typed);
     if (parsed.ok) return parsed;
+    first ??= parsed;
   }
-  return { ok: false };
+  return first ?? { ok: false };
+}
+
+/** "A mobile number has 10 digits. I heard 9." beats "Sorry, I didn't catch that." */
+function retryText(lang: string, parsed: Parsed): string {
+  return !parsed.ok && parsed.why ? ui(lang, parsed.why, parsed.vars) : ui(lang, "retry");
+}
+
+/**
+ * After filling: did the site reject the value? Native validity (type="email",
+ * pattern…) or aria-invalid set by the site's own validation. Returns its message.
+ */
+export function rejectedBySite(info: FieldInfo): string | null {
+  if (info.kind === "choice" || info.kind === "check") return null;
+  const el = info.el as HTMLInputElement;
+  const native = !!el.validity && !el.validity.valid && !el.validity.valueMissing;
+  if (!native && el.getAttribute("aria-invalid") !== "true") return null;
+  const ids = el.getAttribute("aria-errormessage") ?? el.getAttribute("aria-describedby") ?? "";
+  const linked = ids.split(/\s+/).map((id) => (id ? document.getElementById(id)?.textContent?.trim() : "")).filter(Boolean).join(" ");
+  return (el.validationMessage || linked).replace(/\s+/g, " ").slice(0, 160);
 }
 
 /** Pause after the guide stops talking before opening the mic, so room echo dies down. */
@@ -373,7 +394,7 @@ export async function assistField(host: AssistHost, info: FieldInfo, opts: Field
     attempt++;
     let parsed = parseBest(info, answer);
     if (!parsed.ok) {
-      prompt = `${ui(lang, "retry")}\n\n${question}`;
+      prompt = `${retryText(lang, parsed)}\n\n${question}`;
       continue;
     }
     // Speech gets misheard; typed answers are what the user meant.
@@ -392,10 +413,16 @@ export async function assistField(host: AssistHost, info: FieldInfo, opts: Field
       typed = verdict.typed;
     }
     if (rejected || !parsed.ok) {
-      prompt = rejected ? question : `${ui(lang, "retry")}\n\n${question}`;
+      prompt = rejected ? question : `${retryText(lang, parsed)}\n\n${question}`;
       continue;
     }
     await put(host, info, meta, parsed);
+    if (signal.aborted) return "stop";
+    const problem = rejectedBySite(info);
+    if (problem !== null) {
+      prompt = `${problem ? ui(lang, "siteInvalid", { message: problem }) : ui(lang, "hintFormat")}\n\n${question}`;
+      continue;
+    }
     host.emit({ type: "field:filled", flowId: host.flowId, label: info.label, by: typed ? "typed" : "voice" });
     return signal.aborted ? "stop" : "next";
   }
