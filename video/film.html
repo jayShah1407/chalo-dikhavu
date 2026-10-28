@@ -1,0 +1,908 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chalo Dikhavu Film</title>
+<!--
+  Chalo Dikhavu: the feature film. One self-contained page: open it in a browser and press Play.
+  Every scene is CSS animation; music and sound effects are synthesized live with Web Audio,
+  and the audio clock drives the timeline so picture and sound stay in sync. Space pauses.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@400;600&family=Noto+Sans+Gujarati:wght@400;600&family=Noto+Sans+Tamil&family=Noto+Sans+Telugu&family=Noto+Sans+Kannada&family=Noto+Sans+Bengali&family=Noto+Sans+Gurmukhi&display=swap" rel="stylesheet">
+<style>
+  @property --accent { syntax: "<color>"; inherits: true; initial-value: #4f8cff; }
+  :root {
+    --ink: #f3f5fa; --muted: #9aa3b8; --bg: #05070d; --blue: #4f8cff; --saffron: #ffa53d; --red: #ff5d5d; --green: #34d399;
+    --font: "Segoe UI Variable Display", "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, "Nirmala UI", "Noto Sans Devanagari", "Noto Sans Gujarati", "Noto Sans Tamil", "Noto Sans Telugu", "Noto Sans Kannada", "Noto Sans Bengali", "Noto Sans Gurmukhi", sans-serif;
+    --mono: "Cascadia Code", "JetBrains Mono", Consolas, Menlo, monospace;
+    --ease: cubic-bezier(.2,.7,.2,1);
+  }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { height: 100%; background: #000; overflow: hidden; font-family: var(--font); color: var(--ink); }
+  #film { position: absolute; left: 50%; top: 50%; width: 1920px; height: 1080px; overflow: hidden; background: var(--bg);
+    transform-origin: center center; --accent: #4f8cff; transition: --accent 1.2s; }
+
+  /* ---------- living background ---------- */
+  /* Soft glows are radial gradients, not blurred shapes: a live blur filter over the whole frame drops frames. */
+  .blobs { position: absolute; inset: -200px; opacity: .6; }
+  .blob { position: absolute; border-radius: 50%; will-change: transform; }
+  .blob.b1 { width: 1400px; height: 1400px; left: 650px; top: -250px; background: radial-gradient(closest-side, var(--accent), transparent); opacity: .42; animation: float1 18s ease-in-out infinite; }
+  .blob.b2 { width: 1100px; height: 1100px; left: -100px; top: 400px; background: radial-gradient(closest-side, #2b3f8f, transparent); opacity: .6; animation: float2 22s ease-in-out infinite; }
+  .blob.b3 { width: 900px; height: 900px; left: 1300px; top: 560px; background: radial-gradient(closest-side, var(--accent), transparent); opacity: .25; animation: float1 26s ease-in-out infinite reverse; }
+  @keyframes float1 { 50% { transform: translate(-220px, 140px) scale(1.15); } }
+  @keyframes float2 { 50% { transform: translate(260px, -120px) scale(.9); } }
+  .gridlines { position: absolute; inset: 0; opacity: .07;
+    background-image: linear-gradient(rgba(255,255,255,.6) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.6) 1px, transparent 1px);
+    background-size: 80px 80px; mask-image: radial-gradient(900px 600px at 50% 50%, #000, transparent); }
+  .grain { position: absolute; inset: 0; opacity: .05; pointer-events: none;
+    background-image: radial-gradient(rgba(255,255,255,.7) 1px, transparent 1px); background-size: 3px 3px; }
+  .vignette { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(1300px 820px at 50% 50%, transparent 50%, rgba(0,0,0,.6)); }
+  .corner { position: absolute; left: 70px; top: 52px; font-size: 26px; font-weight: 700; letter-spacing: -.5px; opacity: 0; transition: opacity .8s; z-index: 5; }
+  .corner b { color: var(--accent); font-weight: 700; transition: color 1.2s; }
+  .corner.on { opacity: .9; }
+
+  /* ---------- shared animation vocabulary ---------- */
+  .scene { position: absolute; inset: 0; display: none; }
+  .scene.on { display: block; }
+  /* Each scene fades out in its last 0.6 s (--leave is set per scene from the timeline). */
+  .scene { animation: out .6s var(--leave, 999s) both; }
+  @keyframes out { to { opacity: 0; filter: blur(10px); transform: scale(1.02); } }
+  .center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+  .a { opacity: 0; animation: rise .8s var(--d, 0s) var(--ease) both; }
+  .p { opacity: 0; animation: pop .55s var(--d, 0s) cubic-bezier(.3,1.5,.5,1) both; }
+  .f { opacity: 0; animation: fadeIn .6s var(--d, 0s) both; }
+  .gone { animation: fadeAway .5s var(--d, 0s) both; }
+  @keyframes rise { from { opacity: 0; transform: translateY(26px); filter: blur(8px); } to { opacity: 1; transform: none; filter: none; } }
+  @keyframes pop { from { opacity: 0; transform: scale(.6); } to { opacity: 1; transform: none; } }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes fadeAway { to { opacity: 0; filter: blur(6px); } }
+  @keyframes type { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+  @keyframes pulse { 0% { box-shadow: 0 0 0 0 var(--ring, rgba(79,140,255,.55)); } 70% { box-shadow: 0 0 0 26px rgba(0,0,0,0); } 100% { box-shadow: 0 0 0 0 rgba(0,0,0,0); } }
+  @keyframes ripple { from { opacity: 1; transform: scale(.2); } to { opacity: 0; transform: scale(1.8); } }
+  .typed { display: inline-block; white-space: nowrap; clip-path: inset(0 100% 0 0); animation: type var(--t, 1.4s) var(--d, 0s) steps(var(--n, 24)) both; }
+  .ripple { position: absolute; width: 70px; height: 70px; margin: -35px; border-radius: 50%; border: 3px solid var(--accent); opacity: 0; animation: ripple .7s var(--d) ease-out both; }
+
+  /* ---------- 1. hook ---------- */
+  .lead { font-size: 78px; font-weight: 650; letter-spacing: -1.5px; line-height: 1.15; }
+  .lead .w { display: inline-block; opacity: 0; animation: rise .9s var(--d) var(--ease) both; margin: 0 .12em; }
+  .soft { color: var(--muted); } .warm { color: var(--saffron); }
+  #h1 { animation: fadeAway .6s 2.8s both; }
+  .fcards { position: absolute; inset: 0; animation: fadeAway .7s 6.8s both; }
+  .fcard { position: absolute; width: 360px; padding: 22px 26px; border-radius: 18px; background: rgba(22, 27, 40, .92);
+    border: 1px solid rgba(255,255,255,.08); box-shadow: 0 30px 80px rgba(0,0,0,.55); opacity: 0;
+    animation: cardIn 1s var(--d) var(--ease) both, drift 8s var(--d) ease-in-out both; }
+  .fcard .lbl { font-size: 20px; color: #c8cfdd; margin-bottom: 12px; }
+  .fcard .box { height: 52px; border-radius: 10px; border: 1.5px solid rgba(255,255,255,.18); display: flex; align-items: center; padding: 0 16px; color: #6d7588; font-size: 19px; }
+  .fcard .err { margin-top: 10px; color: var(--red); font-size: 17px; font-weight: 600; opacity: 0; animation: rise .4s var(--e) both; }
+  .fcard.bad .box { animation: badBox .4s var(--e) both; }
+  @keyframes cardIn { from { opacity: 0; transform: translate(var(--fx), var(--fy)) scale(.82) rotate(var(--r)); filter: blur(14px); }
+                      to { opacity: 1; transform: rotate(var(--r)); filter: blur(var(--b)); } }
+  @keyframes drift { to { translate: var(--dx) var(--dy); } }
+  @keyframes badBox { to { border-color: var(--red); box-shadow: 0 0 0 4px rgba(255, 93, 93, .15); } }
+  #h2 { animation: fadeAway .6s 6.8s both; }
+  #h2 .lead { font-size: 100px; text-shadow: 0 10px 60px rgba(0,0,0,.9); }
+  #h3 { animation: fadeAway .6s 10.3s both; }
+
+  /* ---------- 2. logo ---------- */
+  .burst { position: absolute; left: 960px; top: 540px; width: 40px; height: 40px; margin: -20px; border-radius: 50%;
+    background: radial-gradient(closest-side, rgba(160, 195, 255, .95), rgba(79, 140, 255, 0)); opacity: 0; animation: burst 1.6s .75s cubic-bezier(.1,.8,.2,1) both; }
+  @keyframes burst { 0% { opacity: 0; transform: scale(.2); } 15% { opacity: 1; } 100% { opacity: 0; transform: scale(60); } }
+  .shock { position: absolute; left: 960px; top: 540px; width: 300px; height: 300px; margin: -150px; border-radius: 50%;
+    border: 2px solid rgba(79, 140, 255, .6); opacity: 0; animation: shock 1.8s .8s cubic-bezier(.1,.8,.2,1) both; }
+  @keyframes shock { 0% { opacity: .9; transform: scale(.3); } 100% { opacity: 0; transform: scale(5); } }
+  .wordmark { font-size: 156px; font-weight: 750; letter-spacing: -4px; display: flex; }
+  .wordmark .l { display: inline-block; opacity: 0; animation: letter .9s cubic-bezier(.2,.7,.2,1) both; }
+  .wordmark .sp { width: 44px; } .wordmark .b { color: var(--blue); }
+  @keyframes letter { from { opacity: 0; filter: blur(24px); transform: translateY(20px) scale(1.25); } to { opacity: 1; filter: none; transform: none; } }
+  .tag { font-size: 48px; font-weight: 550; margin-top: 26px; }
+  .lcur { position: absolute; width: 64px; height: 64px; left: 0; top: 0; animation: glide 1.5s 1.3s cubic-bezier(.45,0,.2,1) both; filter: drop-shadow(0 0 18px rgba(79,140,255,.9)); }
+  @keyframes glide { from { transform: translate(-120px, 860px); opacity: 0; } 20% { opacity: 1; } to { transform: translate(1460px, 600px); opacity: 1; } }
+
+  /* ---------- 3. what ---------- */
+  .kicker { font-size: 26px; font-weight: 700; letter-spacing: 6px; text-transform: uppercase; color: var(--accent); }
+  .big { font-size: 92px; font-weight: 750; letter-spacing: -2.5px; line-height: 1.05; }
+  .pillars { display: flex; gap: 26px; margin-top: 54px; }
+  .pillar { display: flex; align-items: center; gap: 16px; padding: 20px 30px; border-radius: 999px; font-size: 32px; font-weight: 600;
+    background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.14); }
+  .pillar svg { width: 34px; height: 34px; stroke: var(--accent); fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+
+  /* ---------- feature scene frame ---------- */
+  .ftext { position: absolute; left: 130px; top: 200px; width: 700px; }
+  .fnum { font: 700 24px var(--font); letter-spacing: 5px; color: var(--accent); }
+  .ftitle { font-size: 76px; font-weight: 750; letter-spacing: -2px; line-height: 1.04; margin-top: 18px; }
+  .fline { font-size: 30px; color: #c3cad9; line-height: 1.4; margin-top: 24px; }
+  .fbul { margin-top: 40px; display: grid; gap: 18px; }
+  .fbul div { display: flex; gap: 16px; align-items: flex-start; font-size: 25px; color: #dfe4ee; line-height: 1.35; }
+  .fbul i { flex: none; width: 30px; height: 30px; border-radius: 50%; background: color-mix(in srgb, var(--accent) 22%, transparent); display: grid; place-items: center; margin-top: 1px; }
+  .fbul i svg { width: 16px; height: 16px; stroke: var(--accent); stroke-width: 3.2; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+  .panel { position: absolute; left: 910px; top: 150px; width: 880px; height: 780px; border-radius: 32px;
+    background: linear-gradient(160deg, rgba(30, 38, 60, .82), rgba(12, 16, 28, .9)); border: 1px solid rgba(255,255,255,.1);
+    box-shadow: 0 60px 140px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.08); overflow: hidden;
+    opacity: 0; animation: panelIn 1s .25s var(--ease) both; }
+  @keyframes panelIn { from { opacity: 0; transform: translateY(40px) scale(.95) rotateX(8deg); filter: blur(10px); } to { opacity: 1; transform: none; filter: none; } }
+  .panel .shine { position: absolute; inset: 0; background: radial-gradient(600px 300px at 80% 0%, color-mix(in srgb, var(--accent) 22%, transparent), transparent); pointer-events: none; }
+  .dots { position: absolute; left: 130px; bottom: 90px; display: flex; gap: 12px; }
+  .dots span { width: 34px; height: 6px; border-radius: 3px; background: rgba(255,255,255,.16); }
+  .dots span.on { background: var(--accent); width: 60px; }
+  .tagsoon { display: inline-block; margin-top: 30px; font-size: 20px; color: var(--accent); border: 1px solid color-mix(in srgb, var(--accent) 50%, transparent); padding: 6px 14px; border-radius: 999px; }
+
+  /* shared UI bits inside panels */
+  .card { position: absolute; background: #fff; color: #1b2433; border-radius: 18px; box-shadow: 0 24px 60px rgba(0,0,0,.4); }
+  .bub { position: absolute; padding: 18px 22px; border-radius: 18px; font-size: 24px; line-height: 1.35; box-shadow: 0 20px 50px rgba(0,0,0,.35); }
+  .bub.guide { background: #fff; color: #1b2433; border-top-left-radius: 6px; }
+  .bub.user { background: var(--accent); color: #07101f; font-weight: 600; border-top-right-radius: 6px; }
+  .bub .meta { font-size: 15px; color: #6b7487; margin-bottom: 6px; font-weight: 500; }
+  .chip { position: absolute; padding: 12px 20px; border-radius: 14px; font-size: 24px; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.14); white-space: nowrap; }
+  .mono { font-family: var(--mono); }
+  .gcur { position: absolute; left: 0; top: 0; width: 40px; height: 40px; filter: drop-shadow(0 0 14px var(--accent)); z-index: 4; }
+  .wave { display: flex; gap: 6px; align-items: center; height: 70px; }
+  .wave b { width: 7px; border-radius: 4px; background: var(--accent); height: 100%; transform: scaleY(.15); animation: bar .9s ease-in-out infinite alternate; }
+  @keyframes bar { to { transform: scaleY(var(--h, .9)); } }
+  .check { display: inline-grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: #1f9d63; color: #fff; font-size: 20px; font-weight: 700; }
+
+  /* F1 live cursor */
+  .mock { position: absolute; left: 40px; top: 40px; width: 800px; height: 700px; border-radius: 18px; background: #f4f6fb; overflow: hidden; }
+  .mock .mbar { height: 38px; background: #1d2230; display: flex; gap: 8px; align-items: center; padding: 0 16px; }
+  .mock .mbar span { width: 11px; height: 11px; border-radius: 50%; background: #3a4258; }
+  .mock .nav { position: absolute; left: 0; right: 0; top: 38px; height: 62px; background: #fff; display: flex; align-items: center; padding: 0 30px; gap: 34px; color: #4a5568; font-size: 19px; border-bottom: 1px solid #e5e9f1; }
+  .mock .nav .logo { width: 30px; height: 30px; border-radius: 8px; background: #1356c4; margin-right: auto; }
+  .sk { position: absolute; border-radius: 12px; background: #e4e9f2; }
+  .mcard { position: absolute; top: 260px; width: 230px; height: 176px; border-radius: 16px; background: #fff; border: 1px solid #e3e7ef; padding: 18px; color: #1a2e57; font-weight: 650; font-size: 20px; }
+  .mcard .sk { position: static; height: 12px; margin-top: 14px; }
+  .mbtn { position: absolute; left: 292px; top: 462px; width: 216px; height: 66px; border-radius: 14px; background: #1356c4; color: #fff; display: grid; place-items: center; font-size: 21px; font-weight: 650; }
+  .f1spot { position: absolute; border-radius: 14px; box-shadow: 0 0 0 3px var(--accent), 0 0 0 2000px rgba(10,16,30,.35); opacity: 0;
+    animation: f1spot 7s .8s cubic-bezier(.45,0,.2,1) both; }
+  @keyframes f1spot {
+    0% { opacity: 0; left: 470px; top: 58px; width: 108px; height: 40px; }
+    14% { opacity: 1; left: 470px; top: 58px; width: 108px; height: 40px; }
+    31% { opacity: 1; left: 470px; top: 58px; width: 108px; height: 40px; }
+    40%, 57% { opacity: 1; left: 282px; top: 252px; width: 248px; height: 192px; }
+    66%, 100% { opacity: 1; left: 284px; top: 454px; width: 232px; height: 82px; } }
+  .f1cur { animation: f1cur 7s .8s cubic-bezier(.45,0,.2,1) both; }
+  @keyframes f1cur {
+    0% { transform: translate(720px, 640px); opacity: 0; } 4% { opacity: 1; }
+    14%, 31% { transform: translate(524px, 80px); opacity: 1; }
+    40%, 57% { transform: translate(410px, 350px); opacity: 1; }
+    66%, 100% { transform: translate(410px, 500px); opacity: 1; } }
+  .tip { position: absolute; padding: 12px 18px; border-radius: 12px; background: #fff; color: #1b2433; font-size: 19px; font-weight: 600; box-shadow: 0 16px 40px rgba(0,0,0,.35); white-space: nowrap; opacity: 0; }
+  .tip small { color: #1356c4; font-weight: 700; margin-right: 8px; }
+  .tip.life { animation: tipLife 1.6s var(--d) both; } .tip.stay { animation: rise .5s var(--d) var(--ease) both; }
+  @keyframes tipLife { 0% { opacity: 0; transform: translateY(8px); } 12%, 85% { opacity: 1; transform: none; } 100% { opacity: 0; } }
+
+  /* F2 ask */
+  .orb { position: absolute; left: 395px; top: 70px; width: 90px; height: 90px; border-radius: 50%; background: var(--accent); display: grid; place-items: center; --ring: rgba(255,165,61,.55); opacity: 0; animation: pop .55s .6s cubic-bezier(.3,1.5,.5,1) both, pulse 1.4s 1.2s infinite; }
+  .orb svg { width: 40px; height: 40px; stroke: #1a1206; fill: none; stroke-width: 2.4; stroke-linecap: round; }
+  .f2wave { position: absolute; left: 0; right: 0; top: 185px; justify-content: center; }
+  .f2q { position: absolute; left: 70px; right: 70px; top: 290px; text-align: center; font-size: 46px; font-weight: 650; }
+  .res { position: absolute; left: 90px; width: 700px; height: 74px; border-radius: 16px; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.1); display: flex; align-items: center; padding: 0 24px; gap: 18px; font-size: 25px; }
+  .res .meter { margin-left: auto; width: 220px; height: 10px; border-radius: 5px; background: rgba(255,255,255,.12); overflow: hidden; }
+  .res .meter i { display: block; height: 100%; width: 0; background: var(--accent); animation: grow 1s var(--d) var(--ease) forwards; }
+  @keyframes grow { to { width: var(--w); } }
+  .res.win.a { animation: rise .8s var(--d) var(--ease) both, winRow .5s var(--e) both; }
+  @keyframes winRow { to { background: color-mix(in srgb, var(--accent) 22%, transparent); border-color: var(--accent); } }
+  .startpill { position: absolute; left: 0; right: 0; margin: 0 auto; width: fit-content; top: 660px; padding: 16px 28px; border-radius: 999px; background: var(--accent); color: #1a1206; font-size: 25px; font-weight: 700; }
+
+  /* F3 do it with me */
+  .fld { position: absolute; left: 80px; top: 70px; width: 720px; padding: 22px 26px; }
+  .fld .lb { font-size: 20px; font-weight: 650; color: #2d3748; }
+  .fld .lb b { color: #c53030; }
+  .fld .in { margin-top: 12px; height: 64px; border-radius: 12px; border: 2px solid #cfd6e3; display: flex; align-items: center; padding: 0 20px; font-size: 30px; font-family: var(--mono); color: #1b2433; animation: fldDone .4s 6.3s both; }
+  @keyframes fldDone { to { border-color: #1f9d63; box-shadow: 0 0 0 4px rgba(31,157,99,.15); } }
+  .words { position: absolute; right: 80px; top: 360px; display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; width: 600px; animation: wordsOut .6s 3.2s both; }
+  .words span { padding: 10px 16px; border-radius: 12px; background: var(--accent); color: #062014; font-weight: 650; font-size: 25px; }
+  @keyframes wordsOut { to { opacity: 0; filter: blur(14px); transform: scale(.9); } }
+  .digits { position: absolute; right: 80px; top: 352px; font-family: var(--mono); font-size: 64px; font-weight: 700; letter-spacing: 3px; opacity: 0;
+    background: linear-gradient(90deg, #fff 0%, var(--accent) 50%, #fff 100%); background-size: 200% 100%; -webkit-background-clip: text; background-clip: text; color: transparent;
+    animation: digitsIn .8s 3.4s var(--ease) both, shimmer 1.6s 3.4s linear 2; }
+  @keyframes digitsIn { from { opacity: 0; transform: scale(1.3); filter: blur(12px); } to { opacity: 1; transform: none; filter: none; } }
+  @keyframes shimmer { from { background-position: 200% 0; } to { background-position: 0 0; } }
+
+  /* F4 understands India */
+  .xrow { position: absolute; left: 50px; right: 50px; height: 104px; display: flex; align-items: center; gap: 22px; }
+  .xrow .said { padding: 16px 22px; border-radius: 16px; background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.14); font-size: 24px; max-width: 470px; }
+  .xrow .said::before { content: "🎙 "; }
+  .xrow .arr { flex: 1; height: 3px; background: linear-gradient(90deg, rgba(255,255,255,.1), var(--accent)); transform-origin: left; transform: scaleX(0); animation: drawX .45s var(--d) var(--ease) forwards; min-width: 40px; position: relative; }
+  .xrow .arr::after { content: ""; position: absolute; right: -2px; top: -6px; border: 7px solid transparent; border-left: 10px solid var(--accent); }
+  @keyframes drawX { to { transform: scaleX(1); } }
+  .xrow .val { padding: 16px 22px; border-radius: 16px; background: var(--accent); color: #12082a; font-weight: 750; font-size: 27px; font-family: var(--mono); white-space: nowrap; }
+
+  /* F5 why */
+  .src { position: absolute; left: 60px; width: 360px; padding: 18px 22px; border-radius: 16px; font-size: 21px; line-height: 1.35; border: 1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.05); }
+  .src b { color: var(--accent); }
+  .src.hot.a { animation: rise .8s var(--d) var(--ease) both, hot .5s var(--e) both; }
+  @keyframes hot { to { background: color-mix(in srgb, var(--accent) 18%, transparent); border-color: var(--accent); box-shadow: 0 0 40px color-mix(in srgb, var(--accent) 35%, transparent); } }
+  .answer { position: absolute; left: 450px; top: 300px; width: 380px; padding: 24px; border-radius: 20px; background: #fff; color: #1b2433; font-size: 22px; line-height: 1.45; box-shadow: 0 24px 60px rgba(0,0,0,.4); }
+  .speak { display: flex; align-items: center; gap: 10px; color: #0e7490; font-weight: 700; font-size: 17px; margin-bottom: 10px; }
+  .priv { position: absolute; left: 60px; right: 60px; bottom: 50px; padding: 18px 24px; border-radius: 16px; background: rgba(52, 211, 153, .1); border: 1px solid rgba(52, 211, 153, .4); font-size: 21px; display: flex; gap: 14px; align-items: center; }
+  .dotsT { position: absolute; left: 450px; top: 230px; display: flex; gap: 8px; opacity: 0; animation: dotsLife 1.5s 1.2s both; }
+  @keyframes dotsLife { 0% { opacity: 0; } 12%, 85% { opacity: 1; } 100% { opacity: 0; } }
+  .dotsT b { width: 12px; height: 12px; border-radius: 50%; background: #fff; opacity: .5; animation: bounce .6s infinite alternate; }
+  .dotsT b:nth-child(2) { animation-delay: .2s; } .dotsT b:nth-child(3) { animation-delay: .4s; }
+  @keyframes bounce { to { transform: translateY(-8px); opacity: 1; } }
+
+  /* F6 safe */
+  .shield { position: absolute; right: -60px; top: 120px; width: 520px; height: 520px; opacity: .08; }
+  .lockrow { position: absolute; left: 70px; width: 740px; height: 92px; border-radius: 16px; background: #fff; color: #1b2433; display: flex; align-items: center; padding: 0 24px; gap: 18px; box-shadow: 0 20px 50px rgba(0,0,0,.35); }
+  .lockrow .k { width: 160px; font-size: 19px; font-weight: 650; color: #4a5568; }
+  .lockrow .v { flex: 1; font-family: var(--mono); font-size: 26px; letter-spacing: 3px; color: #1b2433; }
+  .badge { padding: 9px 14px; border-radius: 999px; background: #ffe4e6; color: #be123c; font-size: 17px; font-weight: 700; display: flex; gap: 8px; align-items: center; }
+  .noear { position: absolute; left: 70px; top: 420px; width: 740px; padding: 22px 26px; border-radius: 18px; border: 1px dashed rgba(251, 113, 133, .6); font-size: 24px; display: flex; gap: 18px; align-items: center; background: rgba(251,113,133,.08); }
+  .subbtn { position: absolute; left: 70px; top: 590px; width: 280px; height: 76px; border-radius: 16px; background: #1356c4; display: grid; place-items: center; font-size: 26px; font-weight: 700; opacity: 0; animation: rise .8s 2.8s var(--ease) both, press .25s 4.3s; }
+  @keyframes press { 50% { transform: scale(.94); filter: brightness(.85); } }
+  .hand { position: absolute; left: 0; top: 0; width: 40px; height: 40px; animation: handIn 1.2s 3.1s cubic-bezier(.45,0,.2,1) both; filter: drop-shadow(0 4px 8px rgba(0,0,0,.4)); }
+  @keyframes handIn { from { transform: translate(700px, 760px); opacity: 0; } 20% { opacity: 1; } to { transform: translate(206px, 622px); opacity: 1; } }
+
+  /* F7 languages */
+  .stepcard { position: absolute; left: 120px; top: 190px; width: 640px; height: 210px; padding: 30px 34px; }
+  .stepcard .meta { font-size: 18px; color: #6b7487; }
+  .swap { position: relative; height: 120px; margin-top: 18px; }
+  .swap div { position: absolute; inset: 0; font-size: 40px; font-weight: 650; color: #1a2e57; opacity: 0; animation: swapIn 1.8s var(--d) both; }
+  .swap div.last { animation: rise .6s var(--d) var(--ease) both; }
+  @keyframes swapIn { 0% { opacity: 0; transform: translateY(18px); } 15%, 85% { opacity: 1; transform: none; } 100% { opacity: 0; transform: translateY(-18px); } }
+  .langtabs { position: absolute; left: 120px; top: 100px; display: flex; gap: 12px; }
+  .langtabs span { padding: 10px 20px; border-radius: 999px; font-size: 22px; font-weight: 650; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.14); }
+  .langtabs span.hl { animation: tabOn 1.8s var(--d) both; }
+  .langtabs span.hl.last { animation: tabOnStay .3s var(--d) both; }
+  @keyframes tabOn { 0%, 100% { background: rgba(255,255,255,.08); color: var(--ink); } 10%, 90% { background: var(--accent); color: #1a1206; } }
+  @keyframes tabOnStay { to { background: var(--accent); color: #1a1206; } }
+  .voicebar { position: absolute; left: 120px; top: 430px; width: 640px; display: flex; align-items: center; gap: 20px; padding: 20px 26px; border-radius: 18px; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12); }
+  .voicebar .lab { font-size: 21px; font-weight: 650; }
+  .orbit { position: absolute; font-size: 26px; font-weight: 650; padding: 10px 18px; border-radius: 999px; background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.12); }
+
+  /* F8 insights */
+  .evts { position: absolute; left: 60px; top: 60px; display: flex; gap: 10px; flex-wrap: wrap; width: 760px; }
+  .evts span { padding: 8px 14px; border-radius: 10px; font-family: var(--mono); font-size: 18px; background: rgba(45, 212, 191, .12); border: 1px solid rgba(45, 212, 191, .4); color: #99f6e4; }
+  .fun { position: absolute; left: 60px; width: 760px; display: flex; align-items: center; gap: 18px; height: 56px; }
+  .fun .nm { width: 170px; font-size: 21px; color: #cfd6e4; }
+  .fun .tr { flex: 1; height: 34px; border-radius: 8px; background: rgba(255,255,255,.06); overflow: hidden; }
+  .fun .tr i { display: block; height: 100%; width: 0; border-radius: 8px; background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 60%, #000), var(--accent)); animation: grow 1s var(--d) var(--ease) forwards; }
+  .fun.drop .tr i { background: linear-gradient(90deg, #9f1239, #fb7185); }
+  .fun .pc { width: 66px; text-align: right; font-weight: 700; font-size: 22px; }
+  .droptag { position: absolute; left: 520px; top: 316px; padding: 8px 14px; border-radius: 10px; background: #fb7185; color: #2a0510; font-weight: 750; font-size: 19px; }
+  .missing { position: absolute; left: 60px; top: 520px; width: 760px; padding: 22px 26px; border-radius: 18px; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12); }
+  .missing h5 { font-size: 20px; color: var(--muted); font-weight: 600; margin-bottom: 12px; }
+  .missing div { font-size: 24px; padding: 6px 0; }
+
+  /* diff */
+  .dtitle { position: absolute; left: 0; right: 0; top: 96px; text-align: center; font-size: 76px; font-weight: 750; letter-spacing: -2px; }
+  .table { position: absolute; left: 190px; top: 250px; width: 1540px; }
+  .trow { display: grid; grid-template-columns: 560px repeat(4, 1fr); align-items: center; height: 92px; border-bottom: 1px solid rgba(255,255,255,.08); }
+  .trow.head { height: 80px; border: 0; font-size: 24px; font-weight: 700; color: var(--muted); }
+  .trow div { text-align: center; font-size: 30px; }
+  .trow div:first-child { text-align: left; font-size: 27px; color: #e6eaf2; }
+  .trow .ours { color: #fff; }
+  .colhl { position: absolute; left: calc(190px + 560px + 3 * 245px); top: 236px; width: 245px; height: 570px; border-radius: 24px;
+    background: color-mix(in srgb, var(--accent) 16%, transparent); border: 2px solid var(--accent); box-shadow: 0 0 80px color-mix(in srgb, var(--accent) 35%, transparent); }
+  .yes { color: var(--green); font-weight: 800; } .no { color: rgba(255,255,255,.28); } .some { color: #fbbf24; font-size: 22px !important; font-weight: 700; }
+  .punch { position: absolute; left: 0; right: 0; top: 880px; text-align: center; font-size: 40px; font-weight: 650; }
+  .punch b { color: var(--accent); }
+
+  /* dev */
+  .term, .editor, .docs { position: absolute; border-radius: 20px; overflow: hidden; box-shadow: 0 40px 100px rgba(0,0,0,.55); border: 1px solid rgba(255,255,255,.1); }
+  .term { left: 110px; top: 200px; width: 860px; height: 190px; background: #0b0f17; }
+  .editor { left: 110px; top: 420px; width: 860px; height: 470px; background: #0d1220; }
+  .wbar { height: 42px; background: rgba(255,255,255,.05); display: flex; align-items: center; gap: 8px; padding: 0 16px; font-size: 16px; color: var(--muted); }
+  .wbar span { width: 12px; height: 12px; border-radius: 50%; background: #3a4258; }
+  .wbar em { margin-left: 12px; font-style: normal; }
+  .code { padding: 22px 30px; font: 500 25px/1.6 var(--mono); color: #dbe4ff; }
+  .code .ln { display: block; white-space: pre; }
+  .code .c { color: #6b7a99; } .code .k { color: #c792ea; } .code .s { color: #c3e88d; } .code .fn { color: #82aaff; } .code .pr { color: var(--accent); } .code .ok { color: var(--green); }
+  .docs { left: 1030px; top: 200px; width: 780px; height: 690px; background: #f7f8fb; color: #1b2433; display: grid; grid-template-columns: 230px 1fr; }
+  .docs .side { background: #eef1f7; padding: 64px 18px 18px; display: grid; align-content: start; gap: 8px; }
+  .docs .side div { padding: 10px 14px; border-radius: 10px; font-size: 18px; color: #4a5568; }
+  .docs .side div.on { background: #fff; color: #1356c4; font-weight: 700; box-shadow: 0 2px 8px rgba(0,0,0,.06); }
+  .docs .main { padding: 64px 34px 30px; }
+  .docs h4 { font-size: 34px; color: #1a2e57; }
+  .docs p { font-size: 19px; color: #4a5568; line-height: 1.5; margin-top: 12px; }
+  .docs .snip { margin-top: 18px; padding: 16px 18px; border-radius: 12px; background: #0d1220; color: #dbe4ff; font: 500 18px/1.6 var(--mono); }
+  .docs .url { position: absolute; left: 0; right: 0; top: 0; height: 46px; background: #1d2230; color: #b8c0d2; font-size: 16px; display: flex; align-items: center; padding: 0 18px; gap: 8px; }
+  .badges { position: absolute; left: 110px; right: 110px; top: 930px; display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+  .badges span { padding: 12px 20px; border-radius: 999px; font-size: 21px; font-weight: 650; background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.14); }
+  .devtitle { position: absolute; left: 110px; top: 90px; font-size: 64px; font-weight: 750; letter-spacing: -1.5px; }
+  .devtitle b { color: var(--accent); }
+
+  /* who */
+  .who { position: absolute; left: 200px; right: 200px; top: 470px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 26px; }
+  .who div { display: flex; align-items: center; gap: 20px; padding: 28px 30px; border-radius: 22px; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12); font-size: 32px; font-weight: 650; }
+  .who svg { width: 46px; height: 46px; stroke: var(--accent); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+
+  /* cta */
+  .ctas { display: flex; gap: 28px; margin-top: 64px; }
+  .cta { width: 470px; padding: 30px 32px; border-radius: 24px; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.14); text-align: left; }
+  .cta .h { font-size: 20px; letter-spacing: 3px; text-transform: uppercase; color: var(--accent); font-weight: 700; }
+  .cta .v { font-size: 27px; font-weight: 650; margin-top: 12px; }
+  .cta .v.mono { font-size: 25px; color: #c3e88d; }
+  .cta .s { font-size: 19px; color: var(--muted); margin-top: 8px; }
+
+  /* ---------- player chrome ---------- */
+  #start { position: absolute; inset: 0; z-index: 50; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 30px;
+    background: radial-gradient(1000px 700px at 50% 45%, #13203d, #05070d 70%); cursor: pointer; }
+  #start .name { font-size: 104px; font-weight: 750; letter-spacing: -3px; }
+  #start .name b { color: var(--blue); }
+  #start .play { width: 140px; height: 140px; border-radius: 50%; background: var(--blue); display: grid; place-items: center; animation: pulse 2s infinite; }
+  #start .play svg { width: 56px; height: 56px; margin-left: 8px; fill: #fff; }
+  #start .hint { font-size: 28px; color: var(--muted); }
+  #end { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; flex-direction: column; gap: 30px; background: var(--bg); z-index: 40; }
+  #end.on { display: flex; animation: fadeIn .6s both; }
+  #end button { font: 650 28px var(--font); color: #fff; background: var(--blue); border: 0; border-radius: 999px; padding: 20px 40px; cursor: pointer; }
+  #controls { position: fixed; left: 0; right: 0; bottom: 0; z-index: 60; padding: 14px 18px 16px; display: flex; align-items: center; gap: 10px;
+    background: linear-gradient(transparent, rgba(0,0,0,.7)); opacity: 0; transition: opacity .3s; }
+  #controls.show { opacity: 1; }
+  #controls button { width: 40px; height: 40px; border: 0; border-radius: 10px; background: rgba(255,255,255,.12); color: #fff; font-size: 18px; cursor: pointer; }
+  #controls button:hover { background: rgba(255,255,255,.22); }
+  #bar { flex: 1; height: 5px; border-radius: 3px; background: rgba(255,255,255,.18); overflow: hidden; }
+  #bar i { display: block; height: 100%; width: 0; background: var(--blue); }
+  #time { font: 600 14px/1 var(--font); color: #cfd6e4; min-width: 86px; text-align: right; font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body>
+<div id="film">
+  <div class="blobs"><div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div></div>
+  <div class="gridlines"></div>
+  <div class="corner" id="corner">Chalo <b>Dikhavu</b></div>
+
+  <!-- ============ HOOK ============ -->
+  <section class="scene" id="hook">
+    <div class="center" id="h1">
+      <div class="lead"><span class="w" style="--d:.3s">Every</span><span class="w" style="--d:.42s">day,</span><span class="w" style="--d:.54s">millions</span><span class="w" style="--d:.66s">of</span><span class="w" style="--d:.78s">Indians</span></div>
+      <div class="lead soft"><span class="w" style="--d:1.2s">open</span><span class="w" style="--d:1.32s">an</span><span class="w" style="--d:1.44s">online</span><span class="w" style="--d:1.56s">form.</span></div>
+    </div>
+    <div class="fcards">
+      <div class="fcard" style="left:140px;top:120px;--r:-6deg;--b:0px;--fx:-80px;--fy:-40px;--dx:20px;--dy:30px;--d:3s"><div class="lbl">PAN number *</div><div class="box">ABCDE1234F</div></div>
+      <div class="fcard bad" style="left:620px;top:70px;--r:3deg;--b:1px;--fx:0px;--fy:-90px;--dx:-14px;--dy:24px;--d:3.2s;--e:5s"><div class="lbl">IFSC code *</div><div class="box">SBIN000</div><div class="err">Invalid IFSC</div></div>
+      <div class="fcard" style="left:1180px;top:110px;--r:5deg;--b:0px;--fx:80px;--fy:-50px;--dx:-24px;--dy:20px;--d:3.4s"><div class="lbl">Date of birth (DD/MM/YYYY) *</div><div class="box">__ / __ / ____</div></div>
+      <div class="fcard" style="left:1460px;top:470px;--r:-4deg;--b:2px;--fx:120px;--fy:0px;--dx:-30px;--dy:-10px;--d:3.6s"><div class="lbl">Politically exposed person?</div><div class="box">Select…</div></div>
+      <div class="fcard" style="left:90px;top:520px;--r:4deg;--b:1.5px;--fx:-120px;--fy:20px;--dx:24px;--dy:-16px;--d:3.8s"><div class="lbl">Nominee relationship *</div><div class="box">Select…</div></div>
+      <div class="fcard bad" style="left:420px;top:790px;--r:-3deg;--b:0px;--fx:-40px;--fy:90px;--dx:16px;--dy:-26px;--d:4s;--e:5.4s"><div class="lbl">Mobile number *</div><div class="box">98250 1234</div><div class="err">Enter a valid 10-digit number</div></div>
+      <div class="fcard" style="left:1080px;top:800px;--r:6deg;--b:1px;--fx:60px;--fy:100px;--dx:-20px;--dy:-24px;--d:4.2s"><div class="lbl">Annual income *</div><div class="box">Select…</div></div>
+      <div class="fcard" style="left:1500px;top:820px;--r:-6deg;--b:3px;--fx:100px;--fy:80px;--dx:-20px;--dy:-14px;--d:4.4s"><div class="lbl">Upload signature *</div><div class="box">No file chosen</div></div>
+    </div>
+    <div class="center" id="h2"><div class="lead"><span class="w" style="--d:4.8s">…and</span><span class="w warm" style="--d:5.05s">get</span><span class="w warm" style="--d:5.2s">stuck.</span></div></div>
+    <div class="center" id="h3">
+      <div class="lead"><span class="w" style="--d:7.3s">Not</span><span class="w" style="--d:7.4s">because</span><span class="w" style="--d:7.5s">they</span><span class="w" style="--d:7.6s">can't.</span></div>
+      <div class="lead soft" style="margin-top:14px"><span class="w" style="--d:8.3s">Because</span><span class="w" style="--d:8.4s">no</span><span class="w" style="--d:8.5s">one</span><span class="w" style="--d:8.6s">shows</span><span class="w" style="--d:8.7s">them</span><span class="w" style="--d:8.8s">how.</span></div>
+    </div>
+  </section>
+
+  <!-- ============ LOGO ============ -->
+  <section class="scene" id="logo">
+    <div class="burst"></div><div class="shock"></div>
+    <div class="center">
+      <div class="wordmark" data-wordmark="0.85"></div>
+      <div class="tag a" style="--d:2.7s">It doesn't tell. <span style="color:var(--blue)">It shows.</span></div>
+    </div>
+    <svg class="lcur" viewBox="0 0 24 24"><path d="M4 2 L20 12 L12.5 13.5 L9 21 Z" fill="#4f8cff" stroke="#fff" stroke-width="1.4" stroke-linejoin="round"/></svg>
+  </section>
+
+  <!-- ============ WHAT ============ -->
+  <section class="scene" id="what">
+    <div class="center">
+      <div class="kicker a" style="--d:.2s">Meet Chalo Dikhavu</div>
+      <div class="big a" style="--d:.55s;margin-top:22px">An AI guide that lives<br>on your website.</div>
+      <div class="pillars">
+        <div class="pillar p" style="--d:2.1s"><svg viewBox="0 0 24 24"><path d="M5 3 L19 11 L12.5 12.5 L9.5 19 Z"/></svg>Shows the way</div>
+        <div class="pillar p" style="--d:2.5s"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>Fills forms by voice</div>
+        <div class="pillar p" style="--d:2.9s"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18"/></svg>Speaks their language</div>
+      </div>
+      <div class="a" style="--d:4s;margin-top:50px;font-size:32px;color:var(--muted)">Here's everything it does.</div>
+    </div>
+  </section>
+
+  <!-- ============ F1 live cursor ============ -->
+  <section class="scene feature" id="f1" data-accent="#4f8cff">
+    <div class="panel"><div class="shine"></div>
+      <div class="mock">
+        <div class="mbar"><span></span><span></span><span></span></div>
+        <div class="nav"><div class="logo"></div><span>Home</span><span>Classes</span><span style="color:#1a2e57;font-weight:650">Teachers</span><span>Fees</span></div>
+        <div class="sk" style="left:40px;top:130px;width:420px;height:34px"></div>
+        <div class="sk" style="left:40px;top:180px;width:300px;height:20px;background:#edf1f7"></div>
+        <div class="mcard" style="left:40px">Science<div class="sk"></div><div class="sk" style="width:70%"></div></div>
+        <div class="mcard" style="left:290px">Maths<div class="sk"></div><div class="sk" style="width:60%"></div></div>
+        <div class="mcard" style="left:540px">English<div class="sk"></div><div class="sk" style="width:75%"></div></div>
+        <div class="mbtn">Book a class</div>
+        <div class="f1spot"></div>
+        <div class="tip life" style="left:330px;top:112px;--d:1.9s"><small>1/3</small>Open “Teachers”</div>
+        <div class="tip life" style="left:300px;top:200px;--d:3.7s"><small>2/3</small>Pick a subject</div>
+        <div class="tip stay" style="left:290px;top:548px;--d:5.5s"><small>3/3</small>Click “Book a class”</div>
+        <div class="ripple" style="left:528px;top:82px;--d:2s"></div>
+        <div class="ripple" style="left:414px;top:352px;--d:3.8s"></div>
+        <div class="ripple" style="left:414px;top:502px;--d:5.6s"></div>
+        <svg class="gcur f1cur" viewBox="0 0 24 24"><path d="M4 2 L20 12 L12.5 13.5 L9 21 Z" fill="#1356c4" stroke="#fff" stroke-width="1.4" stroke-linejoin="round"/></svg>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ F2 ask ============ -->
+  <section class="scene feature" id="f2" data-accent="#ffa53d">
+    <div class="panel"><div class="shine"></div>
+      <div class="orb"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></div>
+      <div class="wave f2wave f" style="--d:.9s"></div>
+      <div class="f2q"><span class="typed" style="--d:1.1s;--t:1.4s;--n:22">“teacher kaise dhunde?”</span></div>
+      <div class="chip p" style="left:250px;top:375px;font-size:19px;--d:2.6s">“techer” = teacher ✓ &nbsp;·&nbsp; Hinglish understood ✓</div>
+      <div class="res win a" style="top:430px;--d:2.9s;--e:3.9s">Find a teacher<span class="meter"><i style="--w:94%;--d:3.1s"></i></span></div>
+      <div class="res a" style="top:515px;--d:3.05s">Book a class<span class="meter"><i style="--w:34%;--d:3.2s"></i></span></div>
+      <div class="res a" style="top:600px;--d:3.2s;opacity:.7">Pay fees<span class="meter"><i style="--w:8%;--d:3.3s"></i></span></div>
+      <div class="startpill p" style="--d:4.6s;top:692px">▶ Starting “Find a teacher”</div>
+    </div>
+  </section>
+
+  <!-- ============ F3 do it with me ============ -->
+  <section class="scene feature" id="f3" data-accent="#34d399">
+    <div class="panel"><div class="shine"></div>
+      <div class="card fld a" style="--d:.5s"><div class="lb">Mobile number <b>*</b></div><div class="in"><span class="typed" style="--d:5.6s;--t:.7s;--n:11">98250 12345</span>&nbsp;<span class="check p" style="--d:6.3s">✓</span></div></div>
+      <div class="bub guide a" style="left:80px;top:250px;--d:.9s"><div class="meta">Chalo Dikhavu · 3/8</div>What's your mobile number?</div>
+      <div class="words">
+        <span class="p" style="--d:1.7s">ninety eight</span><span class="p" style="--d:1.95s">twenty five</span><span class="p" style="--d:2.2s">zero one two</span><span class="p" style="--d:2.45s">three four five</span>
+      </div>
+      <div class="digits">98250 12345</div>
+      <div class="bub guide a" style="left:80px;top:480px;--d:4.3s"><div class="meta">Read back before filling</div>I heard: <b>98250 12345</b>. Is that right?</div>
+      <div class="bub user p" style="right:80px;top:620px;--d:5s">haan ✓</div>
+    </div>
+  </section>
+
+  <!-- ============ F4 understands India ============ -->
+  <section class="scene feature" id="f4" data-accent="#a78bfa">
+    <div class="panel"><div class="shine"></div>
+      <div class="xrow" style="top:70px"><span class="said p" style="--d:.6s">saadhe teen lakh</span><span class="arr" style="--d:.95s"></span><span class="val p" style="--d:1.3s">₹3,50,000</span></div>
+      <div class="xrow" style="top:200px"><span class="said p" style="--d:1.5s">चौदह जुलाई उन्नीस सौ अट्ठानवे</span><span class="arr" style="--d:1.85s"></span><span class="val p" style="--d:2.2s">14/07/1998</span></div>
+      <div class="xrow" style="top:330px"><span class="said p" style="--d:2.4s">S for Sugar, B I N, zero zero…</span><span class="arr" style="--d:2.75s"></span><span class="val p" style="--d:3.1s">SBIN0001234</span></div>
+      <div class="xrow" style="top:460px"><span class="said p" style="--d:3.3s">जय एट जीमेल डॉट कॉम</span><span class="arr" style="--d:3.65s"></span><span class="val p" style="--d:4s">jay@gmail.com</span></div>
+      <div class="xrow" style="top:590px"><span class="said p" style="--d:4.2s">sahi hai na</span><span class="arr" style="--d:4.55s"></span><span class="val p" style="--d:4.9s">✓ Yes</span></div>
+    </div>
+  </section>
+
+  <!-- ============ F5 why ============ -->
+  <section class="scene feature" id="f5" data-accent="#22d3ee">
+    <div class="panel"><div class="shine"></div>
+      <div class="bub user p" style="right:70px;top:70px;--d:.6s">🎙 PAN kyu chahiye?</div>
+      <div class="dotsT"><b></b><b></b><b></b></div>
+      <div class="src a hot" style="top:210px;--d:1.6s;--e:2.4s">① <b>Your approved answer</b><br><span style="color:var(--muted)">exact wording you wrote, instant, free</span></div>
+      <div class="src a" style="top:350px;--d:1.8s;opacity:.65">② <b>AI from your knowledge</b><br><span style="color:var(--muted)">when there's no approved answer</span></div>
+      <div class="answer a" style="--d:2.8s"><div class="speak">🔊 Spoken aloud, in Hindi or English</div>Income-tax rules require a PAN to open a bank account. It's used only to verify you.</div>
+      <div class="priv a" style="--d:4.4s">🔒 Sent to AI: the question and field labels. &nbsp;<b>Never the values people type.</b></div>
+    </div>
+  </section>
+
+  <!-- ============ F6 safe ============ -->
+  <section class="scene feature" id="f6" data-accent="#fb7185">
+    <div class="panel"><div class="shine"></div>
+      <svg class="shield" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.2"><path d="M12 2l8 3v6c0 5-3.5 9.5-8 11-4.5-1.5-8-6-8-11V5z"/></svg>
+      <div class="lockrow a" style="top:70px;--d:.6s"><span class="k">Password</span><span class="v">●●●●●●●●</span><span class="badge p" style="--d:1s">🔒 User types it</span></div>
+      <div class="lockrow a" style="top:180px;--d:1s"><span class="k">OTP</span><span class="v">● ● ● ● ● ●</span><span class="badge p" style="--d:1.4s">🔒 User types it</span></div>
+      <div class="lockrow a" style="top:290px;--d:1.4s"><span class="k">Aadhaar</span><span class="v">XXXX XXXX 1234</span><span class="badge p" style="--d:1.8s">🔒 User types it</span></div>
+      <div class="noear a" style="--d:2.3s"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#fb7185" stroke-width="2" stroke-linecap="round"><path d="M6 9a6 6 0 0 1 12 0c0 4-4 5-4 9a3 3 0 0 1-6 0M3 3l18 18"/></svg>The guide never listens to these, or asks for them aloud.</div>
+      <div class="subbtn">Submit</div>
+      <div class="a" style="position:absolute;left:380px;top:606px;font-size:24px;--d:3s;width:430px">The user presses Submit.<br><b style="color:var(--accent)">Always.</b></div>
+      <svg class="hand" viewBox="0 0 24 24"><path d="M5 2 L5 19 L9.5 15 L12.5 21.5 L15 20.4 L12.1 14 L18 14 Z" fill="#fff" stroke="#111" stroke-width="1.3" stroke-linejoin="round"/></svg>
+      <div class="ripple" style="left:210px;top:628px;--d:4.3s;border-color:#fff"></div>
+    </div>
+  </section>
+
+  <!-- ============ F7 languages & voice ============ -->
+  <section class="scene feature" id="f7" data-accent="#f59e0b">
+    <div class="panel"><div class="shine"></div>
+      <div class="langtabs a" style="--d:.4s"><span class="hl" style="--d:.8s">English</span><span class="hl" style="--d:2.6s">हिन्दी</span><span class="hl last" style="--d:4.4s">ગુજરાતી</span></div>
+      <div class="card stepcard a" style="--d:.5s"><div class="meta">Find a teacher · Step 2 of 3</div>
+        <div class="swap"><div style="--d:.8s">Click “Find Teachers”.</div><div style="--d:2.6s">“Find Teachers” पर क्लिक करें।</div><div class="last" style="--d:4.4s">“Find Teachers” પર ક્લિક કરો.</div></div>
+      </div>
+      <div class="voicebar a" style="--d:1.2s"><span style="font-size:30px">🎙</span><div><div class="lab">Your own recorded voice</div><div style="color:var(--muted);font-size:17px">per step, per language</div></div><div class="wave" id="f7wave" style="margin-left:auto;height:50px"></div></div>
+      <span class="orbit p" style="left:90px;top:580px;--d:2.2s">मराठी</span>
+      <span class="orbit p" style="left:230px;top:600px;--d:2.5s">தமிழ்</span>
+      <span class="orbit p" style="left:370px;top:580px;--d:2.8s">తెలుగు</span>
+      <span class="orbit p" style="left:520px;top:605px;--d:3.1s">ಕನ್ನಡ</span>
+      <span class="orbit p" style="left:660px;top:580px;--d:3.4s">বাংলা</span>
+    </div>
+  </section>
+
+  <!-- ============ F8 insights ============ -->
+  <section class="scene feature" id="f8" data-accent="#2dd4bf">
+    <div class="panel"><div class="shine"></div>
+      <div class="evts"><span class="p" style="--d:.5s">flow:start</span><span class="p" style="--d:.7s">step:show</span><span class="p" style="--d:.9s">ask</span><span class="p" style="--d:1.1s">explain</span><span class="p" style="--d:1.3s">field:filled</span><span class="p" style="--d:1.5s">step:missing</span></div>
+      <div class="fun a" style="top:170px;--d:1.4s"><span class="nm">Started</span><span class="tr"><i style="--w:100%;--d:1.6s"></i></span><span class="pc">100%</span></div>
+      <div class="fun a" style="top:236px;--d:1.55s"><span class="nm">Personal</span><span class="tr"><i style="--w:88%;--d:1.75s"></i></span><span class="pc">88%</span></div>
+      <div class="fun drop a" style="top:302px;--d:1.7s"><span class="nm">Identity</span><span class="tr"><i style="--w:61%;--d:1.9s"></i></span><span class="pc">61%</span></div>
+      <div class="fun a" style="top:368px;--d:1.85s"><span class="nm">Address</span><span class="tr"><i style="--w:59%;--d:2.05s"></i></span><span class="pc">59%</span></div>
+      <div class="fun a" style="top:434px;--d:2s"><span class="nm">Submitted</span><span class="tr"><i style="--w:57%;--d:2.2s"></i></span><span class="pc">57%</span></div>
+      <div class="droptag p" style="--d:3s">People stop at PAN →</div>
+      <div class="missing a" style="--d:3.8s"><h5>Asked, but no guide yet</h5><div class="a" style="--d:4.2s">“nominee kaise badle?”</div><div class="a" style="--d:4.5s">“KYC status kab tak aayega?”</div></div>
+    </div>
+  </section>
+
+  <!-- ============ DIFFERENT ============ -->
+  <section class="scene" id="diff" data-accent="#4f8cff">
+    <div class="dtitle a" style="--d:.2s">Not another product tour.</div>
+    <div class="colhl f" style="--d:1s"></div>
+    <div class="table">
+      <div class="trow head a" style="--d:.6s"><div></div><div>Product tours</div><div>Chatbots</div><div>Help videos</div><div class="ours" style="color:#fff">Chalo Dikhavu</div></div>
+      <div class="trow a" style="--d:1.2s"><div>Shows the way on your live page</div><div class="yes">✓</div><div class="no">✕</div><div class="no">✕</div><div class="yes p" style="--d:1.5s">✓</div></div>
+      <div class="trow a" style="--d:1.9s"><div>Fills the form with the user</div><div class="no">✕</div><div class="no">✕</div><div class="no">✕</div><div class="yes p" style="--d:2.2s">✓</div></div>
+      <div class="trow a" style="--d:2.6s"><div>Understands spoken Hindi & Hinglish</div><div class="no">✕</div><div class="some">Some</div><div class="no">✕</div><div class="yes p" style="--d:2.9s">✓</div></div>
+      <div class="trow a" style="--d:3.3s"><div>Explains “why is this needed?”</div><div class="no">✕</div><div class="yes">✓</div><div class="no">✕</div><div class="yes p" style="--d:3.6s">✓</div></div>
+      <div class="trow a" style="--d:4s"><div>Writes a whole form's steps itself</div><div class="no">✕</div><div class="no">✕</div><div class="no">✕</div><div class="yes p" style="--d:4.3s">✓</div></div>
+    </div>
+    <div class="punch a" style="--d:5.4s">Tours point. Chatbots talk. Videos play. <b>Chalo Dikhavu does it with you.</b></div>
+  </section>
+
+  <!-- ============ DEVELOPERS ============ -->
+  <section class="scene" id="dev" data-accent="#4f8cff">
+    <div class="devtitle a" style="--d:.2s">Add it in minutes. <b>One package.</b></div>
+    <div class="term a" style="--d:.5s"><div class="wbar"><span></span><span></span><span></span><em>terminal</em></div>
+      <div class="code"><span class="ln"><span class="pr">$ </span><span class="typed" style="--d:1s;--t:1.1s;--n:26">npm install chalo-dikhavu</span></span><span class="ln f ok" style="--d:2.4s">+ chalo-dikhavu · zero dependencies · ~30 KB gzipped</span></div>
+    </div>
+    <div class="editor a" style="--d:2.6s"><div class="wbar"><span></span><span></span><span></span><em>app.ts</em></div>
+      <div class="code">
+        <span class="ln f" style="--d:3s"><span class="k">import</span> { <span class="fn">init</span> } <span class="k">from</span> <span class="s">"chalo-dikhavu"</span>;</span>
+        <span class="ln f" style="--d:3.4s"> </span>
+        <span class="ln f" style="--d:3.6s"><span class="fn">init</span>({</span>
+        <span class="ln f" style="--d:3.9s">  flows,                          <span class="c">// your guides</span></span>
+        <span class="ln f" style="--d:4.2s">  languages: [<span class="s">"en"</span>, <span class="s">"hi"</span>, <span class="s">"gu"</span>],</span>
+        <span class="ln f" style="--d:4.5s">});</span>
+        <span class="ln f" style="--d:5s"> </span>
+        <span class="ln f" style="--d:5.2s"><span class="c">// a whole KYC form, guided by voice:</span></span>
+        <span class="ln f" style="--d:5.6s">{ path: <span class="s">"/kyc"</span>, form: <span class="s">"#kyc-form"</span> }</span>
+      </div>
+    </div>
+    <div class="docs a" style="--d:6.2s">
+      <div class="url">🔒 github.com/jayShah1407/chalo-dikhavu#readme</div>
+      <div class="side"><div class="on">Install</div><div>Writing a flow</div><div>Do it with me</div><div>“Why?” answers</div><div>Events &amp; analytics</div><div>API</div></div>
+      <div class="main"><h4>Docs</h4><p>Guides, examples and the full API: flows, form steps, voice, languages, AI answers and events.</p>
+        <div class="snip">&lt;script src="unpkg.com/chalo-dikhavu"&gt;<br>&lt;/script&gt;</div>
+        <p>Works with React, Vue, Angular or plain HTML. TypeScript types included.</p>
+        <h4 style="font-size:24px;margin-top:22px">Writing a flow</h4>
+        <div class="snip">{ id: "find-teacher",<br>&nbsp;&nbsp;title: { en: "Find a teacher", hi: "टीचर ढूंढें" },<br>&nbsp;&nbsp;steps: [{ target: "#teachers",<br>&nbsp;&nbsp;&nbsp;&nbsp;say: "Click “Find Teachers”." }] }</div></div>
+    </div>
+    <div class="badges">
+      <span class="p" style="--d:7.4s">📦 npm: chalo-dikhavu</span><span class="p" style="--d:7.6s">⚡ ~30 KB, zero deps</span><span class="p" style="--d:7.8s">⚛ React · Vue · Angular · HTML</span><span class="p" style="--d:8s">🔷 TypeScript</span><span class="p" style="--d:8.2s">🔓 MIT open source</span>
+    </div>
+  </section>
+
+  <!-- ============ WHO ============ -->
+  <section class="scene" id="who" data-accent="#ffa53d">
+    <div class="dtitle a" style="--d:.2s;top:290px">Made for forms that matter.</div>
+    <div class="who">
+      <div class="p" style="--d:.8s"><svg viewBox="0 0 24 24"><path d="M3 10l9-6 9 6M5 10v9M19 10v9M9 10v9M15 10v9M3 21h18"/></svg>Banks &amp; KYC</div>
+      <div class="p" style="--d:1s"><svg viewBox="0 0 24 24"><path d="M12 2l8 3v6c0 5-3.5 9.5-8 11-4.5-1.5-8-6-8-11V5z"/></svg>Insurance</div>
+      <div class="p" style="--d:1.2s"><svg viewBox="0 0 24 24"><path d="M4 21h16M6 18V9l6-5 6 5v9M10 18v-5h4v5"/></svg>Government portals</div>
+      <div class="p" style="--d:1.4s"><svg viewBox="0 0 24 24"><path d="M2 8l10-5 10 5-10 5zM6 10v5c3 2.5 9 2.5 12 0v-5"/></svg>Education</div>
+      <div class="p" style="--d:1.6s"><svg viewBox="0 0 24 24"><path d="M12 21s-8-5-8-11a5 5 0 0 1 8-3 5 5 0 0 1 8 3c0 6-8 11-8 11z"/></svg>Healthcare</div>
+      <div class="p" style="--d:1.8s"><svg viewBox="0 0 24 24"><rect x="6" y="2" width="12" height="20" rx="3"/><path d="M10 18h4"/></svg>Fintech apps</div>
+    </div>
+  </section>
+
+  <!-- ============ CTA ============ -->
+  <section class="scene" id="cta" data-accent="#4f8cff">
+    <div class="center">
+      <div class="wordmark" data-wordmark="0.2" style="font-size:124px"></div>
+      <div class="tag a" style="--d:1s">Every form, guided. <span style="color:var(--blue)">In every language.</span></div>
+      <div class="ctas">
+        <div class="cta a" style="--d:1.8s"><div class="h">📦 Package</div><div class="v mono">npm i chalo-dikhavu</div><div class="s">Open-source SDK, MIT</div></div>
+        <div class="cta a" style="--d:2.1s"><div class="h">📘 Docs</div><div class="v">github.com/jayShah1407/<br>chalo-dikhavu</div><div class="s">Guides, examples, API</div></div>
+        <div class="cta a" style="--d:2.4s"><div class="h">☁ Chalo Dikhavu Cloud</div><div class="v">AI answers &amp; natural voices</div><div class="s">Coming soon</div></div>
+      </div>
+    </div>
+  </section>
+
+  <div class="grain"></div><div class="vignette"></div>
+
+  <div id="end"><div class="wordmark" style="font-size:80px;letter-spacing:-2px">Chalo&nbsp;<span style="color:var(--blue)">Dikhavu</span></div><button id="replay2">↻ Watch again</button></div>
+  <div id="start">
+    <div class="name">Chalo <b>Dikhavu</b></div>
+    <div class="play"><svg viewBox="0 0 24 24"><path d="M6 4l14 8-14 8z"/></svg></div>
+    <div class="hint">Watch the film · 2 minutes · sound on 🔊</div>
+  </div>
+</div>
+
+<div id="controls">
+  <button id="pp" title="Play / pause (Space)">❚❚</button>
+  <button id="rw" title="Restart">↻</button>
+  <button id="mute" title="Mute (M)">🔊</button>
+  <div id="bar"><i id="fill"></i></div>
+  <span id="time">0:00</span>
+</div>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const film = $("film");
+
+  // ---------------------------------------------------------------- feature scene text
+  const CHECK = `<i><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></i>`;
+  const FEATURES = {
+    f1: ["Shows, doesn't tell.", "A live cursor walks people to the exact button, field and page, one step at a time.",
+      ["Glides to each target and waits for the user", "Re-finds elements after React re-renders", "Opens the right page by itself"]],
+    f2: ["Ask in your own words.", "People just say what they want. Chalo Dikhavu picks the right guide.",
+      ["Voice or text: English, Hindi or Hinglish", "Typos, plurals and mishearings are fine", "Hold Space to talk, from any page"]],
+    f3: ["“Do it with me.”", "Point it at a form and it fills it with the user by voice, asking every field in turn.",
+      ["One line of config for a whole form", "Reads back every answer before filling", "Works with React, Vue and Angular forms"]],
+    f4: ["Understands how India speaks.", "Lakh and crore, Hindi numbers, spelled-out codes, Hinglish yes and no.",
+      ["Amounts, dates and phone numbers said any way", "PAN, IFSC, GSTIN, account numbers", "Catches a lost digit before it's filled"]],
+    f5: ["Answers “why?”", "When people hesitate, they can ask. The answer is spoken, then the form carries on.",
+      ["Your own approved wording comes first", "AI answers grounded in your knowledge", "Typed values never leave the page"]],
+    f6: ["Safe by design.", "Built for banks and government forms, where trust is everything.",
+      ["Never hears passwords, OTPs, PINs, card or Aadhaar numbers", "Never presses Submit for the user", "Every spoken answer is confirmed first"]],
+    f7: ["Every language. A human voice.", "Switch language any time, even halfway through a form.",
+      ["Interface in English, हिन्दी and ગુજરાતી", "Your steps and recordings in any language", "Natural AI voices with Chalo Dikhavu Cloud"]],
+    f8: ["See where people get stuck.", "Every step, question and answer becomes an event for your analytics.",
+      ["Find the field where people drop off", "See questions you don't have a guide for yet", "Labels only, never the values typed"]],
+  };
+  const fids = Object.keys(FEATURES);
+  fids.forEach((id, i) => {
+    const [title, line, bullets] = FEATURES[id];
+    const s = $(id);
+    s.insertAdjacentHTML("afterbegin", `<div class="ftext">
+      <div class="fnum a" style="--d:.15s">${String(i + 1).padStart(2, "0")} / 08 &nbsp;·&nbsp; FEATURE</div>
+      <div class="ftitle a" style="--d:.3s">${title}</div>
+      <div class="fline a" style="--d:.55s">${line}</div>
+      <div class="fbul">${bullets.map((b, k) => `<div class="a" style="--d:${1.4 + k * 0.45}s">${CHECK}<span>${b}</span></div>`).join("")}</div>
+      ${id === "f8" ? `<div class="tagsoon a" style="--d:3s">Dashboard in Chalo Dikhavu Cloud · coming soon</div>` : ""}
+    </div><div class="dots">${fids.map((_, k) => `<span class="${k === i ? "on" : ""}"></span>`).join("")}</div>`);
+  });
+  // Waveforms
+  const fillWave = (el, n) => { for (let i = 0; i < n; i++) { const b = document.createElement("b"); b.style.setProperty("--h", (0.3 + Math.random() * 0.7).toFixed(2)); b.style.animationDelay = `${(Math.random() * 0.9).toFixed(2)}s`; el.append(b); } };
+  fillWave(document.querySelector(".f2wave"), 44);
+  fillWave($("f7wave"), 22);
+  for (const el of document.querySelectorAll("[data-wordmark]")) {
+    const start = parseFloat(el.dataset.wordmark);
+    [..."Chalo Dikhavu"].forEach((c, i) => {
+      const s = document.createElement("span");
+      s.className = c === " " ? "sp" : "l" + (i >= 6 ? " b" : "");
+      s.textContent = c === " " ? "" : c;
+      s.style.animationDelay = `${start + i * 0.045}s`;
+      el.append(s);
+    });
+  }
+  function fit() {
+    const s = Math.min(innerWidth / 1920, innerHeight / 1080);
+    film.style.transform = `translate(-50%, -50%) scale(${s})`;
+  }
+  addEventListener("resize", fit);
+  fit();
+
+  // ---------------------------------------------------------------- timeline
+  const SCENES = [
+    ["hook", 11], ["logo", 5.5], ["what", 6.5],
+    ["f1", 8.5], ["f2", 8], ["f3", 8.5], ["f4", 8], ["f5", 8], ["f6", 8], ["f7", 8], ["f8", 8],
+    ["diff", 10.5], ["dev", 12], ["who", 5.5], ["cta", 9],
+  ];
+  const START = {};
+  let clock = 0;
+  for (const [id, dur] of SCENES) { START[id] = clock; clock += dur; }
+  const END = clock;
+  const EV = [], SFX = [];
+  const at = (t, run) => EV.push({ t, run });
+  const sound = (t, kind, o = {}) => SFX.push({ t, kind, o });
+
+  const ACCENT = { hook: "#4f8cff", logo: "#4f8cff", what: "#4f8cff", diff: "#4f8cff", dev: "#4f8cff", who: "#ffa53d", cta: "#4f8cff" };
+  let current = null; // the scene on screen; its animations are driven by the audio clock
+  for (const [id, dur] of SCENES) {
+    const t = START[id];
+    $(id).style.setProperty("--leave", `${dur - 0.6}s`);
+    at(t, () => {
+      for (const s of document.querySelectorAll(".scene")) s.classList.toggle("on", s.id === id);
+      current = id;
+      film.style.setProperty("--accent", $(id).dataset.accent ?? ACCENT[id] ?? "#4f8cff");
+      $("corner").classList.toggle("on", !["hook", "logo", "cta"].includes(id));
+    });
+    if (id !== "hook" && id !== "logo") sound(t, "whoosh", { v: 0.32, dur: 0.9, up: true });
+  }
+  at(END, () => { current = null; for (const s of document.querySelectorAll(".scene")) s.classList.remove("on"); $("end").classList.add("on"); finish(); });
+
+  /**
+   * Put every animation of the scene on screen exactly where it belongs at film time `t`.
+   * The browser never runs them on its own clock, so a slow frame skips ahead instead of
+   * drifting, and pausing the audio freezes the picture with it.
+   */
+  function seek(t) {
+    const scene = current && $(current);
+    if (!scene) return;
+    const ms = Math.max(0, (t - START[current]) * 1000);
+    for (const a of scene.getAnimations({ subtree: true })) {
+      if (a.playState !== "paused") a.pause();
+      a.currentTime = ms;
+    }
+  }
+
+  // ---------------------------------------------------------------- sound design, scene by scene
+  const S = (id, list) => list.forEach(([dt, kind, o]) => sound(START[id] + dt, kind, o));
+  S("hook", [
+    ...Array.from({ length: 10 }, (_, i) => [0.4 + i, "heart", { v: 0.5 + i * 0.04 }]),
+    [0.3, "whoosh", { v: 0.22 }], [1.2, "whoosh", { v: 0.2 }],
+    [3, "whoosh", { v: 0.18, up: false }], [3.6, "whoosh", { v: 0.16, up: false }], [4.2, "whoosh", { v: 0.16, up: false }],
+    [4.8, "hit", { v: 0.5 }], [5, "buzz"], [5.4, "buzz"],
+    [6.8, "whoosh", { v: 0.3, dur: 1.2 }], [7.3, "tick"], [8.3, "tick"],
+    [8.6, "riser", { dur: 2.6 }],
+  ]);
+  S("logo", [[0.8, "impact"], [1.3, "whoosh", { v: 0.28, dur: 1.4 }], [2.75, "click", { v: 0.6 }], [2.7, "bell", { f: 784, v: 0.16 }]]);
+  S("what", [[0.55, "hit", { v: 0.3 }], [2.1, "pop", { f: 660 }], [2.5, "pop", { f: 784 }], [2.9, "pop", { f: 988 }]]);
+  S("f1", [[2, "click"], [3.8, "click"], [5.6, "click"], [1.9, "pop", { f: 880, v: 0.15 }], [3.7, "pop", { f: 880, v: 0.15 }], [5.5, "pop", { f: 990, v: 0.15 }]]);
+  S("f2", [[0.6, "micon"], ...Array.from({ length: 18 }, (_, i) => [1.1 + i * 0.075, "type"]), [2.6, "pop", { f: 700 }], [3.9, "bell", { f: 880, v: 0.14 }], [4.6, "pop", { f: 1046 }]]);
+  S("f3", [[0.9, "pop", { f: 800 }], [1.7, "mic"], [1.7, "pop", { f: 600, v: .12 }], [1.95, "pop", { f: 660, v: .12 }], [2.2, "pop", { f: 720, v: .12 }], [2.45, "pop", { f: 780, v: .12 }],
+    [3.2, "shimmer"], [4.3, "pop", { f: 880 }], [5, "mic"], ...Array.from({ length: 11 }, (_, i) => [5.6 + i * 0.064, "type"]), [6.3, "success"]]);
+  S("f4", [0, 1, 2, 3, 4].flatMap((i) => [[0.6 + i * 0.9, "mic", { v: 0.6 }], [0.95 + i * 0.9, "whoosh", { v: 0.12, dur: 0.4, up: true }], [1.3 + i * 0.9, "pop", { f: 700 + i * 90 }]]));
+  S("f5", [[0.6, "mic"], [1.6, "pop", { f: 700, v: .15 }], [2.4, "bell", { f: 988, v: 0.14 }], [2.8, "pop", { f: 880 }], [4.4, "lock"]]);
+  S("f6", [[1, "lock"], [1.4, "lock"], [1.8, "lock"], [2.3, "hit", { v: 0.2 }], [4.3, "click", { v: 0.8 }], [4.4, "success"]]);
+  S("f7", [[0.8, "pop", { f: 660 }], [2.6, "pop", { f: 784 }], [4.4, "pop", { f: 988 }], [2.2, "tick"], [2.5, "tick"], [2.8, "tick"], [3.1, "tick"], [3.4, "tick"]]);
+  S("f8", [...[0.5, 0.7, 0.9, 1.1, 1.3, 1.5].map((t, i) => [t, "pop", { f: 600 + i * 70, v: 0.12 }]), [1.6, "whoosh", { v: 0.15, dur: 1 }], [3, "buzz"], [4.2, "tick"], [4.5, "tick"]]);
+  S("diff", [[0.2, "hit", { v: 0.3 }], ...[1.5, 2.2, 2.9, 3.6, 4.3].map((t, i) => [t, "pop", { f: 660 + i * 110 }]), [5.4, "bell", { f: 1046, v: 0.18 }]]);
+  S("dev", [...Array.from({ length: 25 }, (_, i) => [1 + i * 0.044, "type"]), [2.4, "success"], ...[3, 3.6, 3.9, 4.2, 4.5, 5.2, 5.6].map((t) => [t, "type", { v: 1.4 }]), [6.2, "whoosh", { v: 0.2, dur: .7, up: true }], ...[7.4, 7.6, 7.8, 8, 8.2].map((t, i) => [t, "pop", { f: 700 + i * 80, v: .14 }])]);
+  S("who", [0.8, 1, 1.2, 1.4, 1.6, 1.8].map((t, i) => [t, "pop", { f: 600 + i * 80, v: .16 }]));
+  S("cta", [[0.2, "impact", { v: 0.65 }], [1.8, "pop", { f: 784 }], [2.1, "pop", { f: 988 }], [2.4, "pop", { f: 1175 }], [3, "bell", { f: 784, v: 0.2 }]]);
+
+  // ---------------------------------------------------------------- audio engine
+  let ctx, master, music, fx, verb, muted = false;
+  function noise(sec) {
+    const b = ctx.createBuffer(1, Math.max(1, ctx.sampleRate * sec), ctx.sampleRate), d = b.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    return b;
+  }
+  function setupAudio() {
+    ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -14; comp.ratio.value = 3;
+    master = ctx.createGain(); master.gain.value = muted ? 0 : 0.9;
+    master.connect(comp).connect(ctx.destination);
+    verb = ctx.createConvolver();
+    const len = ctx.sampleRate * 3, ir = ctx.createBuffer(2, len, ctx.sampleRate);
+    for (let c = 0; c < 2; c++) { const d = ir.getChannelData(c); for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2.6); }
+    verb.buffer = ir;
+    const wet = ctx.createGain(); wet.gain.value = 0.32; verb.connect(wet).connect(master);
+    music = ctx.createGain(); music.gain.value = 0.3; music.connect(master); music.connect(verb);
+    fx = ctx.createGain(); fx.gain.value = 0.8; fx.connect(master);
+    const fxv = ctx.createGain(); fxv.gain.value = 0.22; fx.connect(fxv).connect(verb);
+  }
+  const NOTE = (n) => { const m = n.match(/^([A-G]#?)(\d)$/); const i = { C: -9, "C#": -8, D: -7, "D#": -6, E: -5, F: -4, "F#": -3, G: -2, "G#": -1, A: 0, "A#": 1, B: 2 }[m[1]]; return 440 * Math.pow(2, (i + (m[2] - 4) * 12) / 12); };
+  function env(g, t, a, peak, hold, r) {
+    g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(peak, t + a);
+    g.gain.setValueAtTime(peak, t + a + hold); g.gain.exponentialRampToValueAtTime(0.0001, t + a + hold + r);
+  }
+  function tone(t, f, type, peak, a, hold, r, dest = fx, glideTo) {
+    const o = ctx.createOscillator(); o.type = type; o.frequency.setValueAtTime(f, t);
+    if (glideTo) o.frequency.exponentialRampToValueAtTime(glideTo, t + a + hold + r * 0.5);
+    const g = ctx.createGain(); env(g, t, a, peak, hold, r);
+    o.connect(g).connect(dest); o.start(t); o.stop(t + a + hold + r + 0.05);
+  }
+  function pad(t, dur, notes, level, cutoff) {
+    const f = ctx.createBiquadFilter(); f.type = "lowpass"; f.frequency.value = cutoff; f.Q.value = 0.6;
+    const g = ctx.createGain(); env(g, t, 1.2, level, Math.max(0, dur - 1.2), 2);
+    f.connect(g).connect(music);
+    for (const n of notes) for (const det of [-8, 8]) {
+      const o = ctx.createOscillator(); o.type = "sawtooth"; o.frequency.value = NOTE(n); o.detune.value = det;
+      o.connect(f); o.start(t); o.stop(t + dur + 2.2);
+    }
+  }
+  function kick(t, v = 1) { tone(t, 120, "sine", 0.5 * v, 0.003, 0.02, 0.32, music, 42); }
+  function hat(t, v = 1) {
+    const n = ctx.createBufferSource(); n.buffer = noise(0.06);
+    const f = ctx.createBiquadFilter(); f.type = "highpass"; f.frequency.value = 7000;
+    const g = ctx.createGain(); g.gain.setValueAtTime(0.07 * v, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.05);
+    n.connect(f).connect(g).connect(music); n.start(t); n.stop(t + 0.07);
+  }
+  function score(t0) {
+    const BEAT = 0.625; // 96 bpm
+    const dark = [["A3", "C4", "E4", "A2"], ["F3", "A3", "C4", "F2"], ["C4", "E4", "G4", "C3"], ["G3", "B3", "D4", "G2"]];
+    const bright = [["C4", "E4", "G4", "C3"], ["G3", "B3", "D4", "G2"], ["A3", "C4", "E4", "A2"], ["F3", "A3", "C4", "F2"]];
+    const groove0 = START.what, groove1 = START.who, outro = START.cta;
+    let i = 0;
+    for (let s = 0; s < END; s += 5, i++) {
+      const t = t0 + s;
+      if (s >= outro - 0.01) { pad(t, END - s + 1, ["C4", "E4", "G4", "B4"], 0.07, 2600); tone(t, NOTE("C2"), "sine", 0.2, 0.6, END - s, 2, music); break; }
+      const ch = (s < groove0 ? dark : bright)[i % 4];
+      pad(t, 5.05, ch.slice(0, 3), s < START.logo ? 0.045 : 0.06, s < START.logo ? 520 : s < groove0 ? 900 : 1700);
+      tone(t, NOTE(ch[3]), "sine", s < START.logo ? 0.12 : 0.16, 0.5, 4.3, 1, music);
+      if (s >= groove0 && s < groove1) {
+        const arp = [ch[0], ch[1], ch[2], ch[1]].map((n) => n.replace(/(\d)/, (d) => String(+d + 1)));
+        for (let k = 0; k < 8; k++) {
+          const bt = t + k * BEAT;
+          kick(bt, k % 4 === 0 ? 1 : 0.75);
+          hat(bt + BEAT / 2, 1);
+          tone(bt, NOTE(arp[k % 4]), "triangle", 0.035, 0.01, 0.05, 0.5, music);
+          tone(bt + BEAT / 2, NOTE(arp[(k + 2) % 4]), "triangle", 0.022, 0.01, 0.05, 0.45, music);
+        }
+      }
+    }
+  }
+  function sfx(kind, t, o) {
+    const v = o.v ?? 1;
+    if (kind === "whoosh" || kind === "riser") {
+      const dur = o.dur ?? (kind === "riser" ? 3 : 0.8), up = o.up ?? true;
+      const n = ctx.createBufferSource(); n.buffer = noise(dur + 0.2);
+      const f = ctx.createBiquadFilter(); f.type = "bandpass"; f.Q.value = kind === "riser" ? 4 : 1.2;
+      f.frequency.setValueAtTime(up ? 300 : 2600, t); f.frequency.exponentialRampToValueAtTime(up ? (kind === "riser" ? 5000 : 2800) : 280, t + dur);
+      const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t);
+      g.gain.linearRampToValueAtTime(kind === "riser" ? 0.55 : v, t + dur * (kind === "riser" ? 0.95 : 0.45)); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      n.connect(f).connect(g).connect(fx); n.start(t); n.stop(t + dur + 0.1);
+      if (kind === "riser") tone(t, 180, "sine", 0.1, dur * 0.95, 0, 0.05, fx, 900);
+    } else if (kind === "impact" || kind === "hit") {
+      tone(t, kind === "impact" ? 110 : 150, "sine", (kind === "impact" ? 0.9 : 0.45) * v, 0.005, 0.05, kind === "impact" ? 2.2 : 0.7, fx, 38);
+      const n = ctx.createBufferSource(); n.buffer = noise(1);
+      const f = ctx.createBiquadFilter(); f.type = "lowpass"; f.frequency.value = kind === "impact" ? 900 : 1700;
+      const g = ctx.createGain(); env(g, t, 0.003, 0.45 * v, 0.02, 0.6);
+      n.connect(f).connect(g).connect(fx); n.start(t); n.stop(t + 1);
+    } else if (kind === "heart") {
+      tone(t, 70, "sine", 0.33 * v, 0.01, 0.02, 0.3, fx, 42); tone(t + 0.22, 70, "sine", 0.2 * v, 0.01, 0.02, 0.3, fx, 42);
+    } else if (kind === "click" || kind === "type" || kind === "tick") {
+      const n = ctx.createBufferSource(); n.buffer = noise(0.05);
+      const f = ctx.createBiquadFilter(); f.type = "bandpass"; f.frequency.value = kind === "type" ? 3800 + Math.random() * 1600 : 2400; f.Q.value = 2;
+      const g = ctx.createGain(); g.gain.setValueAtTime((kind === "type" ? 0.14 + Math.random() * 0.08 : kind === "tick" ? 0.22 : 0.5) * v, t); g.gain.exponentialRampToValueAtTime(0.0001, t + (kind === "type" ? 0.03 : 0.06));
+      n.connect(f).connect(g).connect(fx); n.start(t); n.stop(t + 0.07);
+      if (kind === "click") tone(t, 1500, "sine", 0.16 * v, 0.002, 0, 0.06, fx, 600);
+    } else if (kind === "pop") {
+      const f0 = o.f ?? 800; tone(t, f0 * 0.7, "sine", 0.28 * v, 0.01, 0, 0.17, fx, f0);
+    } else if (kind === "mic" || kind === "micon") {
+      tone(t, 660, "sine", 0.09 * v, 0.01, 0, 0.13); tone(t + 0.08, 990, "sine", 0.09 * v, 0.01, 0, 0.13);
+    } else if (kind === "shimmer") {
+      [1046, 1319, 1568, 2093, 2637].forEach((f0, i) => tone(t + i * 0.06, f0, "sine", 0.07, 0.005, 0, 1, fx));
+    } else if (kind === "bell" || kind === "success" || kind === "lock") {
+      const notes = kind === "success" ? [[0, 784], [0.1, 988], [0.2, 1319], [0.3, 1568]] : kind === "lock" ? [[0, 330], [0.07, 494]] : [[0, o.f ?? 784]];
+      const peak = o.v ?? 0.15;
+      for (const [dt, f0] of notes) for (const [m, amp] of [[1, 1], [2.76, 0.33], [5.4, 0.1]])
+        tone(t + dt, f0 * m, "sine", peak * amp, 0.004, 0, kind === "lock" ? 0.45 : 1.6, fx);
+    } else if (kind === "buzz") {
+      const o1 = ctx.createOscillator(); o1.type = "square"; o1.frequency.value = 130;
+      const f = ctx.createBiquadFilter(); f.type = "lowpass"; f.frequency.value = 900;
+      const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.08, t + 0.01); g.gain.setValueAtTime(0.08, t + 0.13); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.19);
+      o1.connect(f).connect(g).connect(fx); o1.start(t); o1.stop(t + 0.21);
+    }
+  }
+
+  // ---------------------------------------------------------------- transport
+  const pristine = film.innerHTML;
+  EV.sort((a, b) => a.t - b.t);
+  let playing = false, ended = false, t0 = 0, idx = 0;
+  // What's audible now: the audio clock minus the output delay (large on Bluetooth headphones).
+  const now = () => ctx.currentTime - t0 - (ctx.outputLatency || ctx.baseLatency || 0);
+  const fmt = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+  function play() {
+    if (!ctx) setupAudio();
+    ended = false; idx = 0;
+    $("start").style.display = "none";
+    t0 = ctx.currentTime + 0.15;
+    for (const s of SFX) sfx(s.kind, t0 + s.t, s.o);
+    score(t0);
+    ctx.resume();
+    playing = true; $("pp").textContent = "❚❚";
+    requestAnimationFrame(tick);
+  }
+  function tick() {
+    if (!playing) return;
+    const t = now();
+    while (idx < EV.length && EV[idx].t <= t) EV[idx++].run();
+    seek(t);
+    $("fill").style.width = `${Math.min(100, (t / END) * 100)}%`;
+    $("time").textContent = `${fmt(Math.max(0, t))} / ${fmt(END)}`;
+    if (!ended) requestAnimationFrame(tick);
+  }
+  function finish() { ended = true; playing = false; $("pp").textContent = "▶"; $("fill").style.width = "100%"; }
+  function pause() {
+    if (!ctx || ended) return;
+    // The picture follows the audio clock, so suspending the audio is all it takes.
+    if (playing) { ctx.suspend(); playing = false; $("pp").textContent = "▶"; }
+    else { ctx.resume(); playing = true; $("pp").textContent = "❚❚"; requestAnimationFrame(tick); }
+  }
+  function restart() {
+    if (ctx) { ctx.close(); ctx = null; }
+    playing = false; ended = true;
+    film.innerHTML = pristine;
+    bind();
+    setTimeout(play, 50);
+  }
+  function bind() {
+    $("start").addEventListener("click", play);
+    $("replay2").addEventListener("click", restart);
+  }
+  bind();
+  $("pp").onclick = () => (ended ? restart() : pause());
+  $("rw").onclick = restart;
+  $("mute").onclick = () => { muted = !muted; if (master) master.gain.value = muted ? 0 : 0.9; $("mute").textContent = muted ? "🔇" : "🔊"; };
+  addEventListener("keydown", (e) => {
+    if (e.code === "Space") { e.preventDefault(); if (!ctx) play(); else if (ended) restart(); else pause(); }
+    if (e.key === "m" || e.key === "M") $("mute").click();
+  });
+  let hideTimer;
+  addEventListener("mousemove", () => { $("controls").classList.add("show"); clearTimeout(hideTimer); hideTimer = setTimeout(() => $("controls").classList.remove("show"), 2200); });
+  window.__film = { START, END, now: () => (ctx ? now() : 0), scene: () => current };
+})();
+</script>
+</body>
+</html>
