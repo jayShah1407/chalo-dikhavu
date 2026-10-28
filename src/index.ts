@@ -8,6 +8,7 @@ export { matchPath } from "./paths";
 export { describeField, collectFields } from "./fields";
 export { questionFor } from "./prompts";
 export { parseAnswer } from "./answers";
+export { CURSOR_PRESETS } from "./cursors";
 export type {
   Advance,
   AiOptions,
@@ -21,6 +22,10 @@ export type {
   Step,
   Target,
   TargetSpec,
+  Theme,
+  CursorOption,
+  CursorPreset,
+  CustomCursor,
 } from "./types";
 
 /** Create and mount a guide in one call: `const guide = init({ flows })`. */

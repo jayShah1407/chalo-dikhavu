@@ -1,5 +1,8 @@
+import { cursorShape, type CursorOption } from "./cursors";
+import { icon } from "./icons";
 import { LANGUAGE_NAMES, ui } from "./i18n";
 import { css } from "./styles";
+import type { Theme } from "./types";
 
 type Attrs = Record<string, string | ((e: Event) => void)>;
 
@@ -17,9 +20,6 @@ function h<K extends keyof HTMLElementTagNameMap>(
   return el;
 }
 
-const CURSOR_SVG =
-  '<svg viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg"><path d="M5 3 L5 22 L10 17.5 L13.5 25 L17 23.5 L13.6 16 L20.5 16 Z" fill="#fff" stroke="#0f172a" stroke-width="1.6" stroke-linejoin="round"/></svg>';
-
 export interface BubbleButton {
   label: string;
   primary?: boolean;
@@ -35,7 +35,7 @@ export interface AnswerBox {
   onSubmit: (text: string) => void;
   /** The user started typing: stop listening so the two don't race. */
   onTyping?: () => void;
-  /** Shows a 🎤 button that listens again (after silence, or to retry). */
+  /** Shows a mic button that listens again (after silence, or to retry). */
   onMic?: () => void;
 }
 
@@ -92,18 +92,19 @@ export class Overlay {
 
   constructor(
     color: string,
+    theme: Theme,
+    cursor: CursorOption,
     lang: string,
     languages: string[],
     showLauncher: boolean,
     private readonly handlers: OverlayHandlers,
   ) {
     this.lang = lang;
-    this.host = h("div", { "data-dikhavu-root": "" });
+    this.host = h("div", { "data-dikhavu-root": "", "data-theme": theme });
     this.root = this.host.attachShadow({ mode: "open" });
 
     this.spot = h("div", { class: "spot" });
-    this.cursor = h("div", { class: "cursor" });
-    this.cursor.innerHTML = CURSOR_SVG + '<span class="ring"></span>';
+    this.cursor = h("div", { class: "cursor" }, cursorShape(cursor), h("span", { class: "ring" }));
     this.bubble = h("div", { class: "bubble", role: "dialog", "aria-live": "polite" });
 
     this.launcher = h("button", { class: "launcher" + (showLauncher ? "" : " hidden"), onclick: () => this.togglePanel() });
@@ -116,13 +117,19 @@ export class Overlay {
     for (const code of languages) this.langSelect.append(h("option", { value: code }, LANGUAGE_NAMES[code] ?? code));
     this.muteBtn = h("button", {
       class: "icon",
+      type: "button",
       "aria-label": "Mute voice",
-      onclick: () => (this.muteBtn.textContent = this.handlers.onToggleMute() ? "🔇" : "🔊"),
-    }, "🔊");
-    const close = h("button", { class: "icon", "aria-label": "Close", onclick: () => this.togglePanel(false) }, "✕");
+      "aria-pressed": "false",
+      onclick: () => {
+        const muted = this.handlers.onToggleMute();
+        this.muteBtn.replaceChildren(icon(muted ? "muted" : "volume"));
+        this.muteBtn.setAttribute("aria-pressed", String(muted));
+      },
+    }, icon("volume"));
+    const close = h("button", { class: "icon", type: "button", "aria-label": "Close", onclick: () => this.togglePanel(false) }, icon("close"));
 
     this.input = h("input", { type: "text", autocomplete: "off" });
-    this.micBtn = h("button", { class: "mic", type: "button", "aria-label": "Hold to talk" }, "🎤");
+    this.micBtn = h("button", { class: "mic", type: "button", "aria-label": "Hold to talk" }, icon("mic"));
     // Hold-to-talk on the button too, for mouse and touch users.
     this.micBtn.addEventListener("pointerdown", (e) => {
       e.preventDefault();
@@ -146,7 +153,7 @@ export class Overlay {
     this.msg = h("p", { class: "msg" });
     this.listTitle = h("p", { class: "list-title" });
     this.flowList = h("div", { class: "flows" });
-    const controls = h("div", { style: "display:flex;gap:4px;align-items:center" });
+    const controls = h("div", { class: "controls" });
     if (languages.length > 1) controls.append(this.langSelect);
     controls.append(this.muteBtn, close);
     this.panel = h("div", { class: "panel", role: "dialog" },
@@ -155,7 +162,7 @@ export class Overlay {
     );
 
     this.heard = h("span", { class: "heard" });
-    this.listening = h("div", { class: "listening" }, h("span", { class: "orb" }, "🎤"), this.heard);
+    this.listening = h("div", { class: "listening" }, h("span", { class: "orb" }, icon("mic")), this.heard);
 
     const style = h("style");
     style.textContent = css(color);
@@ -185,7 +192,7 @@ export class Overlay {
   setLanguage(lang: string): void {
     this.lang = lang;
     this.langSelect.value = lang;
-    this.launcher.replaceChildren(h("span", { class: "dot" }, "🧭"), ui(lang, "help"));
+    this.launcher.replaceChildren(h("span", { class: "dot" }, icon("guide")), ui(lang, "help"));
     this.panelTitle.textContent = ui(lang, "help");
     this.input.placeholder = ui(lang, "askPlaceholder");
     this.hint.textContent = ui(lang, "holdToTalk");
@@ -211,7 +218,7 @@ export class Overlay {
   setFlows(title: string, flows: Array<{ id: string; title: string }>): void {
     this.listTitle.textContent = title;
     this.flowList.replaceChildren(
-      ...flows.map((f) => h("button", { type: "button", onclick: () => this.handlers.onPickFlow(f.id) }, f.title)),
+      ...flows.map((f) => h("button", { type: "button", onclick: () => this.handlers.onPickFlow(f.id) }, h("span", {}, f.title), icon("chevron"))),
     );
   }
 
@@ -248,10 +255,10 @@ export class Overlay {
       const parts: Node[] = [input];
       if (answer.onMic) {
         const onMic = answer.onMic;
-        this.answerMic = h("button", { class: "mic", type: "button", "aria-label": "Answer by voice", onclick: () => onMic() }, "🎤");
+        this.answerMic = h("button", { class: "mic", type: "button", "aria-label": "Answer by voice", onclick: () => onMic() }, icon("mic"));
         parts.push(this.answerMic);
       }
-      parts.push(h("button", { class: "b primary", type: "submit", "aria-label": "Send" }, "↵"));
+      parts.push(h("button", { class: "send", type: "submit", "aria-label": "Send" }, icon("send")));
       children.push(h("form", {
         class: "answer",
         onsubmit: (e) => {

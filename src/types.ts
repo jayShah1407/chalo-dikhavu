@@ -1,8 +1,14 @@
+import type { CursorOption } from "./cursors";
+
+export type { CursorOption, CursorPreset, CustomCursor } from "./cursors";
+
 /**
  * Text that can be given once, or per language code:
  *   "Click here"  |  { en: "Click here", hi: "यहाँ क्लिक करें" }
  */
 export type LocalizedText = string | Record<string, string>;
+
+export type Theme = "light" | "dark" | "auto";
 
 /**
  * How to find an element on the page. A plain string is a CSS selector.
@@ -176,6 +182,16 @@ export interface ChaloDikhavuOptions {
   tts?: boolean;
   /** Accent color for cursor, spotlight and buttons. Default "#4f46e5". */
   color?: string;
+  /**
+   * Panel and bubble colors. "auto" follows the visitor's light/dark system setting; use it
+   * when your site does the same. Default "light".
+   */
+  theme?: Theme;
+  /**
+   * The guide's cursor: "arrow" (default), "brand" (arrow in your color), "dot", "spark" or
+   * "ring"; or your own `{ svg }`, `{ image }` or `{ text }` with optional `size` and `hotspot`.
+   */
+  cursor?: CursorOption;
   /**
    * Navigate to a static path. Default: click a matching <a href> if one is
    * on the page (keeps SPA routing), else full page load. Pass your router's

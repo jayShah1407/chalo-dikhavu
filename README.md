@@ -24,6 +24,8 @@ const guide = init({
   language: "en",
   languages: ["en", "hi"],
   color: "#0b5fd9",
+  theme: "auto",              // "light" (default), "dark", or "auto" to follow the visitor's system setting
+  cursor: "spark",            // the guide's cursor, see below
   navigate: (path) => router.push(path), // optional: use your SPA router
 });
 ```
@@ -33,6 +35,24 @@ Or with a script tag:
 ```html
 <script src="https://unpkg.com/chalo-dikhavu"></script>
 <script>ChaloDikhavu.init({ flows: [...] });</script>
+```
+
+### Cursor styles
+
+| `cursor` | Looks like |
+|---|---|
+| `"arrow"` (default) | A classic white pointer, readable on any page |
+| `"brand"` | The same pointer in your `color` |
+| `"dot"` | A soft glowing dot |
+| `"spark"` | A four-point sparkle |
+| `"ring"` | A target ring with a center dot |
+
+Or bring your own, with `size` (px, default 28) and `hotspot` (the point that lands on the target, default the center):
+
+```ts
+cursor: { svg: '<svg viewBox="0 0 24 24">…</svg>' }      // use currentColor for your brand color
+cursor: { image: "/our-mascot.png", size: 36, hotspot: [4, 2] }
+cursor: { text: "👆", size: 30, hotspot: [12, 2] }        // emoji look different on each device
 ```
 
 ## Writing a flow

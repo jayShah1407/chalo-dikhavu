@@ -84,6 +84,8 @@ export class ChaloDikhavu {
       launcher: true,
       tts: true,
       color: "#4f46e5",
+      theme: "light",
+      cursor: "arrow",
       languages: [language],
       ...options,
       language,
@@ -100,7 +102,7 @@ export class ChaloDikhavu {
   /** Attach the UI and listeners. Resumes a flow that was interrupted by a page load. */
   mount(): this {
     if (this.overlay || typeof document === "undefined") return this;
-    this.overlay = new Overlay(this.opts.color, this.lang, this.opts.languages, this.opts.launcher, {
+    this.overlay = new Overlay(this.opts.color, this.opts.theme, this.opts.cursor, this.lang, this.opts.languages, this.opts.launcher, {
       onAsk: (q) => this.ask(q),
       onMicDown: () => this.startListening(),
       onMicUp: () => void this.finishListening(),
