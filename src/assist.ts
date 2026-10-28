@@ -149,6 +149,8 @@ function voiceTurn(
   unusable: string,
   /** Short replies like "yes" don't need the long end-of-answer pause. */
   shortReply = false,
+  /** Answers on offer (a choice's options): saying one is never mistaken for our own echo. */
+  expected: string[] = [],
 ) {
   const { overlay, lang } = host;
   let listening: AbortController | null = null;
@@ -165,7 +167,7 @@ function voiceTurn(
     cancel();
     if (closed) return;
     if (!host.voice) return overlay.setMicState("problem", ui(lang, "micUnavailable"));
-    host.speaker.stop(); // tapped 🎤 mid-sentence: stop talking first, never listen over ourselves
+    host.speaker.stop(); // tapped the mic mid-sentence: stop talking first, never listen over ourselves
     typing = false;
     const mine = new AbortController();
     listening = mine;
@@ -176,6 +178,7 @@ function voiceTurn(
       lang,
       signal: mine.signal,
       ignore: prompt,
+      expected,
       onInterim: (t) => overlay.setMicState("listening", `${ui(lang, "listeningNow")}: “${t}”`),
       ...host.speech,
       ...(shortReply ? { silenceMs: Math.min(1000, host.speech?.silenceMs ?? 1000) } : {}),
@@ -196,7 +199,7 @@ function voiceTurn(
   };
 
   return {
-    /** Speak, then listen automatically (unless the user already typed or tapped 🎤). */
+    /** Speak, then listen automatically (unless the user already typed or tapped the mic). */
     async start(): Promise<void> {
       await host.speaker.play(prompt, audio, lang);
       if (closed || typing || listening || host.signal.aborted) return;
@@ -235,7 +238,7 @@ function askOnce(
 ): Promise<AskResult> {
   const { overlay, lang, signal } = host;
   return pending<AskResult>(signal, "stop", (done) => {
-    const turn = voiceTurn(host, prompt, audio, (text, alternatives) => (done({ text, typed: false, alternatives }), true), ui(lang, "notHeard"));
+    const turn = voiceTurn(host, prompt, audio, (text, alternatives) => (done({ text, typed: false, alternatives }), true), ui(lang, "notHeard"), false, info.options.map((o) => o.label));
     const buttons: BubbleButton[] = [host.stopButton()];
     if (canAskWhy) buttons.push({ label: ui(lang, "why"), onClick: () => done("why") });
     if (canSkip) buttons.push({ label: ui(lang, "skip"), onClick: () => done("skip") });

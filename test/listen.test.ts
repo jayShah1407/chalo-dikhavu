@@ -149,6 +149,12 @@ describe("isEcho", () => {
     expect(isEcho("male", "Which gender? You can say: Male, Female, Transgender.")).toBe(false);
     expect(isEcho("the second one", "Which gender? You can say: Male, Female.")).toBe(false);
     expect(isEcho("Jay Shah", undefined)).toBe(false);
+    // Saying an offered option word for word is an answer, not an echo (found while filming the product video).
+    const income = "Which annual income? You can say: Below ₹2.5 lakh, ₹2.5 to 5 lakh, ₹5 to 10 lakh, ₹10 to 25 lakh, Above ₹25 lakh.";
+    const options = ["Below ₹2.5 lakh", "₹2.5 to 5 lakh", "₹5 to 10 lakh", "₹10 to 25 lakh", "Above ₹25 lakh"];
+    expect(isEcho("5 to 10 lakh", income, options)).toBe(false);
+    expect(isEcho("below 2.5 lakh", income, options)).toBe(false);
+    expect(isEcho("which annual income you can say below", income, options)).toBe(true);
   });
 });
 

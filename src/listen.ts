@@ -63,6 +63,8 @@ export interface ListenOptions {
   maxMs?: number;
   /** What the guide just said. A transcript that is mostly this is our own voice coming back, and is dropped. */
   ignore?: string;
+  /** Answers the guide offered (a choice's options). Saying one of them is never an echo. */
+  expected?: string[];
 }
 
 const echoWords = (s: string) => s.toLowerCase().split(/[^\p{L}\p{M}\p{N}]+/u).filter(Boolean);
@@ -70,11 +72,18 @@ const echoWords = (s: string) => s.toLowerCase().split(/[^\p{L}\p{M}\p{N}]+/u).f
 /**
  * Is `heard` just the guide's own question picked up by the mic? Only for 3+
  * words: a one-word answer like "Male" is legitimately also in "You can say: Male, Female".
+ * An answer that is one of the `expected` options ("5 to 10 lakh") is the user, not an echo,
+ * even though the guide just read that option out.
  */
-export function isEcho(heard: string, spoken: string | undefined): boolean {
+export function isEcho(heard: string, spoken: string | undefined, expected: string[] = []): boolean {
   if (!spoken) return false;
   const h = echoWords(heard);
   if (h.length < 3) return false;
+  const isOption = expected.some((option) => {
+    const o = echoWords(option);
+    return h.length <= o.length + 1 && h.filter((w) => o.includes(w)).length >= h.length - 1;
+  });
+  if (isOption) return false;
   const said = new Set(echoWords(spoken));
   return h.filter((w) => said.has(w)).length / h.length >= 0.8;
 }
@@ -156,7 +165,7 @@ export function listenOnce(opts: ListenOptions): Promise<ListenResult> {
         const segs: string[][] = [];
         for (let i = 0; i < e.results.length; i++) {
           const result = e.results[i];
-          if (isEcho(result[0].transcript, opts.ignore)) continue;
+          if (isEcho(result[0].transcript, opts.ignore, opts.expected)) continue;
           const guesses: string[] = [];
           for (let k = 0; k < result.length; k++) {
             const g = result[k].transcript.trim();
