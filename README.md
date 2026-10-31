@@ -191,6 +191,26 @@ init({ flows, ai: { endpoint: "https://<chalo-dikhavu cloud>/v1/explain", projec
 
 The Cloud provides tuned, prompt-cached answers for Indian forms (KYC, PAN, Aadhaar and more) in Indian languages, without running a backend. Project keys are public and work only from your allowed origins. Each project gets a free allowance before billing. Self-hosted deployments for banks and other regulated companies are available on request.
 
+## Natural voices (Chalo Dikhavu Cloud)
+
+The browser's own voice sounds robotic, and Firefox can't listen at all. With the Cloud, the guide speaks with natural Indian voices (Sarvam), and can also transcribe spoken answers:
+
+```ts
+init({
+  flows,
+  voice: {
+    endpoint: "https://<chalo-dikhavu cloud>/v1",
+    projectKey: "cd_pub_…",
+    listen: true,   // optional: transcribe answers in the Cloud too (works in Firefox)
+  },
+})
+```
+
+- **Your recordings come first.** A step's own `audio` always plays; the Cloud voice is used for everything else.
+- **Read-backs stay in the browser.** "I heard: 98250 12345. Is that right?" is always spoken by the browser, so what the user said or typed isn't sent to the Cloud for speech.
+- **With `listen: true`, the spoken answer is recorded** (ended by a pause), sent to the Cloud, transcribed and not stored. Without it, the browser's recognition is used.
+- **Nothing breaks without it.** If the Cloud can't help (no credits, offline, unsupported language), the guide falls back to the browser's voice and recognition.
+
 ## API
 
 ```ts

@@ -1,3 +1,4 @@
+import type { CloudVoice } from "./cloudvoice";
 import { pick, speechLocale } from "./i18n";
 import type { LocalizedText } from "./types";
 
@@ -30,9 +31,13 @@ export class Speaker {
   private finish: (() => void) | null = null;
   private generation = 0;
 
-  constructor(private readonly tts: boolean) {}
+  constructor(private readonly tts: boolean, private readonly cloud?: CloudVoice) {}
 
-  play(text: string, audio: LocalizedText | undefined, lang: string): Promise<void> {
+  /**
+   * `personal`: the text contains something the user said or typed. It's spoken by the
+   * browser, never sent to the Cloud.
+   */
+  play(text: string, audio: LocalizedText | undefined, lang: string, personal = false): Promise<void> {
     this.stop();
     if (this.muted) return Promise.resolve();
     const gen = ++this.generation;
@@ -50,18 +55,26 @@ export class Speaker {
       // Last-resort cap so a stuck speech engine can never freeze a flow.
       cap = setTimeout(done, 3000 + text.length * 140);
 
-      const url = pick(audio, lang);
-      if (url) {
+      const fallback = () => void this.speak(text, lang, gen, done, (p) => (poll = p));
+      const playUrl = (url: string) => {
         const el = new Audio(url);
         this.audio = el;
         el.onended = done;
-        el.play().catch(() => {
-          // Missing file or autoplay blocked before any user gesture: fall back to TTS.
-          if (this.audio === el) void this.speak(text, lang, gen, done, (p) => (poll = p));
+        el.onerror = () => this.audio === el && fallback();
+        // Missing file or autoplay blocked before any user gesture: fall back to TTS.
+        el.play().catch(() => this.audio === el && fallback());
+      };
+      const url = pick(audio, lang);
+      if (url) return playUrl(url);
+      if (this.cloud && this.tts && !personal) {
+        void this.cloud.audioFor(text, lang).then((cloudUrl) => {
+          if (gen !== this.generation) return;
+          if (cloudUrl) playUrl(cloudUrl);
+          else fallback();
         });
         return;
       }
-      void this.speak(text, lang, gen, done, (p) => (poll = p));
+      fallback();
     });
   }
 

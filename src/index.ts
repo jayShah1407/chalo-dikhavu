@@ -22,6 +22,7 @@ export type {
   Step,
   Target,
   TargetSpec,
+  VoiceOptions,
   Theme,
   CursorOption,
   CursorPreset,

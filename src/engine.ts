@@ -4,7 +4,8 @@ import { collectFields, describeField, selectorFor, submitButtonOf, type FieldIn
 import { findNow, waitFor } from "./finder";
 import { pick, ui } from "./i18n";
 import { flowTitle, rankFlows, resolve } from "./intent";
-import { canListen, Listener } from "./listen";
+import { CloudVoice, listenCloud } from "./cloudvoice";
+import { canListen, listenOnce, Listener } from "./listen";
 import { Overlay, type BubbleButton } from "./overlay";
 import { isStaticPath, matchPath } from "./paths";
 import { buttonLabel, guideTextFor } from "./prompts";
@@ -62,9 +63,10 @@ function canDo(flow: Flow): boolean {
 }
 
 export class ChaloDikhavu {
-  private readonly opts: Required<Omit<ChaloDikhavuOptions, "onEvent" | "navigate" | "ai" | "knowledge" | "speech">> & Pick<ChaloDikhavuOptions, "onEvent" | "navigate" | "ai" | "knowledge" | "speech">;
+  private readonly opts: Required<Omit<ChaloDikhavuOptions, "onEvent" | "navigate" | "ai" | "knowledge" | "speech" | "voice">> & Pick<ChaloDikhavuOptions, "onEvent" | "navigate" | "ai" | "knowledge" | "speech" | "voice">;
   private overlay: Overlay | null = null;
   private readonly speaker: Speaker;
+  private readonly cloudVoice?: CloudVoice;
   private readonly listener: Listener;
   private lang: string;
   private current: { flow: Flow; ctl: AbortController; mode: RunMode } | null = null;
@@ -92,7 +94,8 @@ export class ChaloDikhavu {
     };
     const saved = storage("local")?.getItem(LANG_KEY);
     this.lang = saved && this.opts.languages.includes(saved) ? saved : language;
-    this.speaker = new Speaker(this.opts.tts);
+    this.cloudVoice = this.opts.voice?.endpoint ? new CloudVoice(this.opts.voice) : undefined;
+    this.speaker = new Speaker(this.opts.tts, this.cloudVoice);
     this.listener = new Listener((text) => {
       if (this.answerSink) this.overlay?.setMicState("listening", `${ui(this.lang, "listeningNow")}: “${text}”`);
       else this.overlay?.showListening(true, text);
@@ -384,8 +387,9 @@ export class ChaloDikhavu {
       flowId: flow.id,
       signal,
       get voice() {
-        return canListen() && !self.voiceOff;
+        return (canListen() || !!self.cloudVoice?.listens) && !self.voiceOff;
       },
+      listen: (o) => (this.cloudVoice?.listens ? listenCloud(o, this.cloudVoice) : listenOnce(o)),
       disableVoice: () => (this.voiceOff = true),
       speech: this.opts.speech,
       emit: (e) => this.emit(e),

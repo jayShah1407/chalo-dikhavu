@@ -151,6 +151,25 @@ export interface ExplainRequest {
   formFields: string[];
 }
 
+/**
+ * Natural voices from Chalo Dikhavu Cloud (Sarvam: Indian English and Indian languages),
+ * instead of the browser's own. Falls back to the browser's voice whenever the Cloud can't help.
+ */
+export interface VoiceOptions {
+  /** The Cloud's API base, e.g. "https://<cloud>/v1". Speech comes from `/tts`, transcripts from `/stt`. */
+  endpoint: string;
+  /** Your publishable key (cd_pub_…). */
+  projectKey?: string;
+  /** A voice id from the Cloud's voice list. Default: the Cloud's default voice. */
+  speaker?: string;
+  /**
+   * Also transcribe spoken answers in the Cloud. More accurate for Indian languages and works
+   * in browsers without speech recognition (Firefox), but the recording is sent to the Cloud.
+   * Default false: the browser's own recognition is used.
+   */
+  listen?: boolean;
+}
+
 export interface AiOptions {
   /**
    * POST endpoint that takes an ExplainRequest and returns `{ answer }`.
@@ -204,6 +223,11 @@ export interface ChaloDikhavuOptions {
    * with an AI model. Without it, only fields' own `why` text is used.
    */
   ai?: AiOptions;
+  /**
+   * Natural voices from the Cloud. Read-backs of what the user said ("I heard: 98250 12345")
+   * always use the browser's voice, so typed and spoken values never leave the page that way.
+   */
+  voice?: VoiceOptions;
   /** Site-wide background for the AI (who you are, support contacts, policies). */
   knowledge?: LocalizedText;
   /**

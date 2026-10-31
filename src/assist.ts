@@ -3,7 +3,7 @@ import { isSubmitButton, type FieldInfo } from "./fields";
 import { isQuestion } from "./explain";
 import { clickElement, fillField } from "./fill";
 import { pick, ui } from "./i18n";
-import { listenOnce } from "./listen";
+import type { ListenOptions, ListenResult } from "./listen";
 import type { AnswerBox, BubbleButton, Overlay } from "./overlay";
 import { buttonLabel, questionFor } from "./prompts";
 import type { FieldOptions, LocalizedText, ChaloDikhavuEvent } from "./types";
@@ -28,6 +28,8 @@ export interface AssistHost {
   voice: boolean;
   /** The mic was blocked: stop trying voice for the rest of this session. */
   disableVoice(): void;
+  /** Listen for one spoken answer (the browser's recognition, or the Cloud's). */
+  listen(opts: ListenOptions): Promise<ListenResult>;
   /** Listening timings from ChaloDikhavuOptions.speech. */
   speech?: { waitMs?: number; silenceMs?: number };
   emit(event: ChaloDikhavuEvent): void;
@@ -151,6 +153,8 @@ function voiceTurn(
   shortReply = false,
   /** Answers on offer (a choice's options): saying one is never mistaken for our own echo. */
   expected: string[] = [],
+  /** The prompt repeats what the user said: speak it with the browser, never the Cloud. */
+  personal = false,
 ) {
   const { overlay, lang } = host;
   let listening: AbortController | null = null;
@@ -174,7 +178,7 @@ function voiceTurn(
     // The bubble shows the mic state and the words as they're heard; the floating
     // "Listening…" pill is for push-to-talk outside a question, and here it would cover the buttons.
     overlay.setMicState("listening", ui(lang, "listeningNow"));
-    const r = await listenOnce({
+    const r = await host.listen({
       lang,
       signal: mine.signal,
       ignore: prompt,
@@ -201,7 +205,7 @@ function voiceTurn(
   return {
     /** Speak, then listen automatically (unless the user already typed or tapped the mic). */
     async start(): Promise<void> {
-      await host.speaker.play(prompt, audio, lang);
+      await host.speaker.play(prompt, audio, lang, personal);
       if (closed || typing || listening || host.signal.aborted) return;
       await sleep(ECHO_GAP_MS, host.signal);
       if (closed || typing || listening || host.signal.aborted) return;
@@ -281,7 +285,7 @@ function confirmValue(host: AssistHost, info: FieldInfo, meta: string, display: 
       }
       return false;
     };
-    const turn = voiceTurn(host, spoken, undefined, byVoice, ui(lang, "sayYesNo"), info.kind !== "name" && info.kind !== "text");
+    const turn = voiceTurn(host, spoken, undefined, byVoice, ui(lang, "sayYesNo"), info.kind !== "name" && info.kind !== "text", [], true);
     overlay.showStep(info.point, meta, `${spoken}\n${ui(lang, "fixBelow")}`, [
       host.stopButton(),
       { label: ui(lang, "no"), onClick: () => done(false) },
